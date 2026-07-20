@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="description" content="区域多源数据时空动态观测与分析" />
+    <title>区域时空动态观测</title>
+    <link rel="stylesheet" href="styles.css?v=20260720-3" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">R</span><div><strong>区域时空动态观测</strong><small>REGIONAL SPATIOTEMPORAL OBSERVATORY</small></div></div>
+      <div class="header-actions"><div class="source"><span></span><div>数据源<strong id="sourceName">正在载入</strong></div></div><button id="methodButton" class="method-button" aria-haspopup="dialog" aria-controls="methodDialog">字段与口径</button></div>
+    </header>
+
+    <main>
+      <section class="heading">
+        <div><p class="eyebrow">多源数据联合分析</p><h1 id="pageTitle">区域时空动态图谱</h1><p>点击地图网格，查看该位置的精确数值与历史变化</p></div>
+        <div class="heading-controls"><label class="region-select">观测地区<select id="regionSelect" aria-label="选择观测地区"></select></label><label class="region-select">观测因子<select id="topicSelect" aria-label="选择观测因子"></select></label><label id="categoryControl" class="region-select" hidden><span id="categoryLabel">细分类别</span><select id="categorySelect" aria-label="选择细分类别"></select></label><div class="mode-switch" role="group" aria-label="时间尺度"><button data-mode="month" class="active">逐月</button><button data-mode="year">逐年</button></div></div>
+      </section>
+
+      <section id="factorOverview" class="factor-overview" hidden aria-label="天气指标概览"></section>
+
+      <section class="metrics" aria-label="当前统计">
+        <article><span id="currentMetricLabel">当前时段总量</span><strong id="totalValue">--</strong><small id="totalUnit">MtC</small></article>
+        <article><span>较上一时段</span><strong id="changeValue">--</strong><small id="changeRate">--</small></article>
+        <article><span id="maxMetricLabel">当前最高网格</span><strong id="maxCell">--</strong><small id="maxValue">--</small></article>
+        <article><span>观测网格</span><strong id="cellCount">--</strong><small>1 km 空间分辨率</small></article>
+      </section>
+
+      <section class="workspace">
+        <article class="map-panel panel">
+          <div class="panel-heading"><div><h2 id="mapTitle">空间排放分布</h2><p id="mapSubtitle">--</p></div><div class="map-tools"><button id="zoomOut" title="缩小" aria-label="缩小">−</button><button id="resetMap" title="复位地图" aria-label="复位地图">⌂</button><button id="zoomIn" title="放大" aria-label="放大">＋</button></div></div>
+          <div id="map" class="map" aria-label="排放网格地图"><svg id="mapSvg" role="img"><g id="gridLayer"></g><path id="selectedOutline"></path></svg><div id="tooltip" class="tooltip" hidden></div><button id="replayOverlay" class="replay-overlay" hidden aria-label="重新播放"><span class="replay-pause" aria-hidden="true"><i></i><i></i></span><strong>播放已结束</strong><small>点击重新播放</small></button></div>
+          <div class="legend"><div id="legendBar"></div><div id="legendValues" class="legend-values"></div><p id="legendLabel">网格排放量（tC）</p></div>
+        </article>
+
+        <aside class="detail-column">
+          <article class="panel cell-detail">
+            <div class="panel-heading"><div><h2>网格详情</h2><p>点击左侧任意网格</p></div><div class="detail-actions"><span id="cellBadge">未选择</span><button id="clearSelection" hidden>返回区域总量</button></div></div>
+            <div id="emptyDetail" class="empty-detail"><span class="target-icon">⌖</span><strong>选择一个网格</strong><p>查看坐标、当前排放量和历史序列</p></div>
+            <div id="detailContent" class="detail-content" hidden>
+              <div class="cell-value"><span id="detailPeriod">--</span><strong id="cellValue">--</strong><small id="cellUnit">tC</small></div>
+              <dl><div><dt>经度</dt><dd id="cellLon">--</dd></div><div><dt>纬度</dt><dd id="cellLat">--</dd></div><div><dt>空间排名</dt><dd id="cellRank">--</dd></div><div id="referenceLonItem" hidden><dt>API 经度</dt><dd id="referenceLon">--</dd></div><div id="referenceLatItem" hidden><dt>API 纬度</dt><dd id="referenceLat">--</dd></div></dl>
+            </div>
+          </article>
+          <article class="panel trend-panel">
+            <div class="panel-heading"><div><h2 id="chartTitle">区域总量趋势</h2><p id="chartSubtitle">完整观测时段</p></div></div>
+            <div class="chart-wrap"><svg id="trendChart" aria-label="排放时间趋势图"></svg></div>
+            <div id="shareTrend" class="share-trend" hidden><div><span>网格占区域比重</span><strong id="shareValue">--</strong></div><svg id="shareChart" aria-label="网格占区域比重趋势图"></svg></div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="timeline-panel">
+        <button id="playButton" class="play" aria-label="播放"><span class="play-icon" aria-hidden="true"></span></button>
+        <div class="timeline-body"><div><strong>时间演进</strong><span id="currentPeriod">--</span></div><input id="timeSlider" type="range" min="0" value="0" aria-label="选择时间" /><div class="timeline-ends"><span id="startPeriod">--</span><span id="endPeriod">--</span></div></div>
+      </section>
+    </main>
+
+    <dialog id="methodDialog" class="method-dialog" aria-labelledby="methodTitle">
+      <div class="method-dialog-heading"><div><p>DATA METHODOLOGY</p><h2 id="methodTitle">字段与统计口径</h2></div><button id="closeMethod" aria-label="关闭">×</button></div>
+      <div class="method-dialog-body">
+        <section class="method-summary"><span id="methodFactor">--</span><p id="methodSummary">--</p></section>
+        <section><h3>当前指标</h3><div id="methodCurrent" class="method-current"></div></section>
+        <section><h3>字段说明</h3><div class="method-table-wrap"><table><thead><tr><th>字段</th><th>含义</th></tr></thead><tbody id="methodFields"></tbody></table></div></section>
+        <section class="method-rules"><article><span>空间统计</span><p id="methodSpatial">--</p></article><article><span>年度聚合</span><p id="methodAnnual">--</p></article></section>
+      </div>
+    </dialog>
+
+    <footer><span id="footerSource">数值来自项目内原始 ODIAC 数据，未进行插值</span><span id="footerUnit">原始单位：吨碳（tC）</span></footer>
+    <script src="data/dataset.js?v=20260720-3"></script>
+    <script src="app.js?v=20260720-3"></script>
+  </body>
+</html>

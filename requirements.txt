@@ -1,0 +1,5 @@
+geopandas>=1.0
+matplotlib>=3.9
+openpyxl>=3.1
+pandas>=2.2
+pillow>=11.0

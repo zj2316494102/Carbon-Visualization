@@ -21,3 +21,39 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+# Generated figures
+/output/
+
+# Local raw datasets (large and reproducible/private source files)
+/data/raw/
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE and editor settings
+.idea/
+*.code-workspace
+*.swp
+*.swo
+
+# Operating-system metadata and temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
+*.log

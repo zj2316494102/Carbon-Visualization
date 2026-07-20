@@ -1,0 +1,34 @@
+{
+  "dataset_name": "ODIAC New York City 1 km CO2 emissions",
+  "region": {
+    "id": "new-york",
+    "name": "New York City",
+    "name_zh": "纽约市",
+    "mode": "all"
+  },
+  "substance": {
+    "name": "CO2 emissions",
+    "value_column": "emission_tc",
+    "source_unit": "tC",
+    "display_unit": "MtC",
+    "display_factor": 0.000001,
+    "aggregation": "sum"
+  },
+  "data": {
+    "files": "data/raw/co2/new_york_odiac_1km/*.csv",
+    "geometry": "data/boundaries/nyc_grid_1km_odiac.geojson",
+    "join_column": "cell_id",
+    "period_column": "period",
+    "source_frequency": "month",
+    "period_format": "%Y%m"
+  },
+  "poi": {
+    "files": "data/raw/poi/new_york/poi_grid_*.csv"
+  },
+  "visual": {
+    "cmap": "YlOrRd",
+    "upper_quantile": 0.99,
+    "fps": 3,
+    "dpi": 130
+  }
+}

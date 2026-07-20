@@ -1,0 +1,8 @@
+区域碳排放观测离线展示
+
+1. 双击 carbon_visualization_demo.html 即可打开。
+2. 不需要安装 Python、Conda，也不需要连接网络或启动服务器。
+3. 页面包含新加坡、纽约市、东京都市区和芝加哥四个地区。
+4. 可切换地区、逐月/逐年播放、暂停、拖动时间轴并点击网格查看详情。
+
+建议使用 Microsoft Edge 或 Google Chrome 打开。

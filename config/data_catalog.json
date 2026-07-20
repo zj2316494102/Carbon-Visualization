@@ -1,0 +1,205 @@
+{
+  "default_region": "singapore",
+  "default_topic": "co2",
+  "regions": [
+    {
+      "id": "singapore",
+      "name": "Singapore",
+      "name_zh": "新加坡",
+      "geometry": "data/boundaries/sg_grid_1km_odiac.geojson",
+      "join_column": "cell_id",
+      "topics": {
+        "co2": { "files": "data/raw/co2/singapore_odiac_1km/*.csv" },
+        "poi": { "files": "data/raw/poi/singapore/poi_grid_*.csv" },
+        "weather": { "files": "data/raw/weather/singapore/*.csv" }
+      }
+    },
+    {
+      "id": "new-york",
+      "name": "New York City",
+      "name_zh": "纽约市",
+      "geometry": "data/boundaries/nyc_grid_1km_odiac.geojson",
+      "join_column": "cell_id",
+      "topics": {
+        "co2": { "files": "data/raw/co2/new_york_odiac_1km/*.csv" },
+        "poi": { "files": "data/raw/poi/new_york/poi_grid_*.csv" },
+        "weather": { "files": "data/raw/weather/new_york/*.csv" }
+      }
+    },
+    {
+      "id": "tokyo",
+      "name": "Tokyo",
+      "name_zh": "东京都市区",
+      "geometry": "data/boundaries/tokyo_grid_1km_odiac.geojson",
+      "join_column": "cell_id",
+      "topics": {
+        "co2": { "files": "data/raw/co2/tokyo_odiac_1km/*.csv" },
+        "poi": { "files": "data/raw/poi/tokyo/poi_grid_*.csv" },
+        "weather": { "files": "data/raw/weather/tokyo/*.csv" }
+      }
+    },
+    {
+      "id": "chicago",
+      "name": "Chicago",
+      "name_zh": "芝加哥",
+      "geometry": "data/boundaries/chicago_grid_1km_odiac.geojson",
+      "join_column": "cell_id",
+      "topics": {
+        "co2": { "files": "data/raw/co2/chicago_odiac_1km/*.csv" },
+        "poi": { "files": "data/raw/poi/chicago/poi_grid_*.csv" },
+        "weather": { "files": "data/raw/weather/chicago/*.csv" }
+      }
+    }
+  ],
+  "topics": {
+    "co2": {
+      "label": "CO2 排放",
+      "adapter": "single_value",
+      "value_column": "emission_tc",
+      "period_column": "period",
+      "period_format": "%Y%m",
+      "temporal_kind": "flow",
+      "unit": "tC",
+      "regional_unit": "MtC",
+      "regional_factor": 0.000001,
+      "value_precision": 2,
+      "regional_precision": 2,
+      "change_precision": 3,
+      "map_title": "空间排放分布",
+      "legend_label": "网格排放量",
+      "source_label": "ODIAC 1 km CO2 emissions",
+      "footer_source": "数值来自项目内原始 ODIAC 数据，未进行插值",
+      "footer_unit": "原始单位：吨碳（tC）",
+      "show_share": true,
+      "methodology": {
+        "summary": "ODIAC 月度化石燃料 CO2 排放量映射到 1 km 网格。地图显示单网格排放，区域值为所有网格排放之和。",
+        "fields": [
+          { "name": "cell_id", "meaning": "1 km 网格唯一编号" },
+          { "name": "period", "meaning": "观测月份，格式 YYYYMM" },
+          { "name": "emission_tc", "meaning": "该网格当月碳排放量，单位 tC" }
+        ],
+        "spatial_rule": "区域月度值为区域内全部网格 emission_tc 求和。",
+        "annual_rule": "年度值为当年 12 个月排放量求和。"
+      },
+      "color_scale": { "quantile": 0.99, "fixed_min": 0, "minimum_max": 0, "zero_color": null, "integer_ticks_below": 0, "css_class": "" }
+    },
+    "poi": {
+      "label": "POI 数量",
+      "adapter": "wide_categories",
+      "period_column": "period",
+      "period_format": "%Y%m",
+      "temporal_kind": "snapshot",
+      "unit": "个",
+      "regional_unit": "个",
+      "regional_factor": 1,
+      "value_precision": 0,
+      "regional_precision": 0,
+      "change_precision": 0,
+      "map_title": "空间 POI 分布",
+      "legend_label": "网格 POI 数量",
+      "source_label": "OSM POI monthly snapshots",
+      "footer_source": "POI 为 OpenStreetMap 月度快照网格统计，未进行插值",
+      "footer_unit": "单位：POI 个数",
+      "show_share": true,
+      "methodology": {
+        "summary": "OpenStreetMap POI 月度快照按 1 km 网格统计。地图显示网格内设施数量，可查看全部类别或单独类别。",
+        "fields": [
+          { "name": "cell_id", "meaning": "1 km 网格唯一编号" },
+          { "name": "period", "meaning": "快照月份，格式 YYYYMM" },
+          { "name": "poi_*", "meaning": "各 POI 类别在网格内的对象数量" },
+          { "name": "poi_total", "meaning": "17 个 POI 类别数量之和" }
+        ],
+        "spatial_rule": "区域值为所选类别在全部网格中的数量之和。",
+        "annual_rule": "POI 是时点存量，年度视图取每年 12 月快照，不累加 12 个月。"
+      },
+      "color_scale": { "quantile": 0.99, "fixed_min": 0, "minimum_max": 5, "zero_color": "#f0f3f1", "integer_ticks_below": 8, "css_class": "poi-scale" },
+      "categories": [
+        { "id": "poi_total", "label": "全部类别" },
+        { "id": "poi_restaurant", "label": "餐饮" },
+        { "id": "poi_school", "label": "学校" },
+        { "id": "poi_university", "label": "大学" },
+        { "id": "poi_fuel", "label": "加油站" },
+        { "id": "poi_hospital", "label": "医院" },
+        { "id": "poi_clinic", "label": "诊所" },
+        { "id": "poi_shop", "label": "商店" },
+        { "id": "poi_tourism", "label": "旅游设施" },
+        { "id": "poi_industrial_landuse", "label": "工业用地" },
+        { "id": "poi_commercial_landuse", "label": "商业用地" },
+        { "id": "poi_residential_landuse", "label": "居住用地" },
+        { "id": "poi_industrial_building", "label": "工业建筑" },
+        { "id": "poi_commercial_building", "label": "商业建筑" },
+        { "id": "poi_retail_building", "label": "零售建筑" },
+        { "id": "poi_warehouse", "label": "仓库" },
+        { "id": "poi_parking", "label": "停车设施" },
+        { "id": "poi_bus_station", "label": "公交站点" }
+      ]
+    },
+    "weather": {
+      "label": "天气特征",
+      "adapter": "wide_metrics",
+      "period_column": "period",
+      "period_format": "%Y%m",
+      "temporal_kind": "metric_defined",
+      "unit": "",
+      "regional_unit": "",
+      "regional_factor": 1,
+      "value_precision": 1,
+      "regional_precision": 1,
+      "change_precision": 1,
+      "map_title": "空间天气分布",
+      "legend_label": "网格天气值",
+      "source_label": "Open-Meteo monthly weather",
+      "footer_source": "气象数据来自 Open-Meteo 月度统计；网格值映射自 API 参考点",
+      "footer_unit": "不同指标使用各自气象单位",
+      "show_share": false,
+      "methodology": {
+        "summary": "Open-Meteo 月度气象统计由少量 API 参考点映射到 1 km 网格。多个网格可能共享同一参考点，因此区域统计先按参考点去重。",
+        "fields": [
+          { "name": "api_lat / api_lon", "meaning": "调用 Open-Meteo API 使用的参考点坐标" },
+          { "name": "temperature_2m_mean_c", "meaning": "月平均 2 m 气温，单位 °C" },
+          { "name": "relative_humidity_2m_mean_pct", "meaning": "月平均 2 m 相对湿度，单位 %" },
+          { "name": "precipitation_sum_mm", "meaning": "月累计降水量，单位 mm" },
+          { "name": "wind_speed_10m_max_kmh", "meaning": "月最大 10 m 风速，单位 km/h" },
+          { "name": "shortwave_radiation_sum_mj_m2", "meaning": "月累计短波辐射，单位 MJ/m²" }
+        ],
+        "spatial_rule": "温度、湿度、降水和辐射取去重 API 参考点的空间均值；风速取参考点空间最大值。网格地图显示各网格所映射参考点的数值。",
+        "annual_rule": "温度和湿度取 12 个月均值；降水和辐射取全年累计；风速取年度最大值。"
+      },
+      "reference_columns": ["api_lat", "api_lon"],
+      "defaultCategory": "temperature_2m_mean_c",
+      "overview": true,
+      "metrics": [
+        {
+          "id": "temperature_2m_mean_c", "label": "平均温度", "short_label": "温度", "unit": "°C",
+          "regional_unit": "°C", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
+          "annual_aggregation": "mean", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
+          "legend_label": "月均 2 m 气温", "palette": "temperature", "show_rate": false, "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-temperature" }
+        },
+        {
+          "id": "relative_humidity_2m_mean_pct", "label": "相对湿度", "short_label": "湿度", "unit": "%",
+          "regional_unit": "%", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
+          "annual_aggregation": "mean", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
+          "legend_label": "月均 2 m 相对湿度", "palette": "humidity", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-humidity" }
+        },
+        {
+          "id": "precipitation_sum_mm", "label": "累计降水", "short_label": "降水", "unit": "mm",
+          "regional_unit": "mm", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
+          "annual_aggregation": "sum", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
+          "legend_label": "月累计降水量", "palette": "precipitation", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-precipitation" }
+        },
+        {
+          "id": "wind_speed_10m_max_kmh", "label": "最大风速", "short_label": "风速", "unit": "km/h",
+          "regional_unit": "km/h", "regional_factor": 1, "spatial_aggregation": "max_unique_reference",
+          "annual_aggregation": "max", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
+          "legend_label": "月最大 10 m 风速", "palette": "wind", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-wind" }
+        },
+        {
+          "id": "shortwave_radiation_sum_mj_m2", "label": "短波辐射", "short_label": "辐射", "unit": "MJ/m²",
+          "regional_unit": "MJ/m²", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
+          "annual_aggregation": "sum", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
+          "legend_label": "月累计短波辐射", "palette": "radiation", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-radiation" }
+        }
+      ]
+    }
+  }
+}
