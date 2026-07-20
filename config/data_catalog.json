@@ -248,19 +248,19 @@
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
           "spatial_aggregation": "weighted_mean_pixels", "map_transform": "log1p", "map_value_column": "ntl_log_radiance_mean",
           "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "log1p 平均辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
+          "legend_label": "log1p 平均辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
         },
         {
           "id": "ntl_radiance_max", "label": "最大辐亮度", "short_label": "最大", "unit": "nW/(cm²·sr)",
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "max",
           "spatial_aggregation": "max", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "最大辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
+          "legend_label": "最大辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
         },
         {
           "id": "ntl_radiance_sum", "label": "总辐亮度", "short_label": "总和", "unit": "nW/(cm²·sr)",
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
           "spatial_aggregation": "sum", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "网格总辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
+          "legend_label": "网格总辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
         }
       ]
     }

@@ -46,7 +46,7 @@
     precipitation: [[238, 248, 247], [191, 227, 223], [112, 193, 198], [39, 125, 161], [25, 74, 120]],
     wind: [[242, 239, 248], [208, 196, 228], [161, 139, 196], [116, 86, 158], [67, 38, 109]],
     radiation: [[255, 247, 204], [248, 214, 109], [238, 168, 60], [222, 107, 45], [169, 54, 38]],
-    nightlights: [[23, 24, 29], [49, 39, 71], [112, 64, 92], [208, 121, 62], [255, 227, 138]],
+    nightlights: [[20, 24, 29], [31, 44, 54], [101, 91, 67], [221, 157, 67], [255, 248, 218]],
   }
 
   function periods() {
@@ -228,7 +228,9 @@
     el('cellCount').textContent = data.meta.cellCount.toLocaleString('zh-CN')
     el('mapTitle').textContent = topic().map_title
     el('legendLabel').textContent = `${setting('legend_label')}（${category()?.legend_unit || sourceUnit()}）`
-    el('legendBar').className = setting('color_scale').css_class
+    const scale = setting('color_scale')
+    el('legendBar').className = scale.css_class
+    el('map').dataset.theme = scale.map_theme || ''
     el('cellUnit').textContent = sourceUnit()
     el('footerSource').textContent = topic().footer_source
     el('footerUnit').textContent = topic().footer_unit
@@ -452,15 +454,19 @@
   function updateMap() {
     const values = frameMapValues()
     const scale = colorScaleRange()
+    const scaleConfig = setting('color_scale')
+    const glow = scaleConfig.glow
     const quality = topic().quality
     const qualityIndex = quality ? (state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)) : null
     Array.from(gridLayer.children).forEach((path, index) => {
       const missing = quality ? quality.ntl_is_missing[index][qualityIndex] === 1 : false
+      const brightness = Math.max(0, Math.min(1, (values[index] - scale.min) / Math.max(1e-12, scale.max - scale.min)))
       path.classList.toggle('missing-data', missing)
+      path.classList.toggle('ntl-high', !missing && glow && brightness >= glow.high_threshold && brightness < glow.peak_threshold)
+      path.classList.toggle('ntl-peak', !missing && glow && brightness >= glow.peak_threshold)
       path.style.fill = missing ? '' : mapColor(values[index], scale.min, scale.max)
     })
     const digits = setting('value_precision')
-    const scaleConfig = setting('color_scale')
     const ticks = scaleConfig.integer_ticks_below > 0 && scale.max <= scaleConfig.integer_ticks_below && scale.min >= 0
       ? Array.from({ length: Math.floor(scale.max) + 1 }, (_, index) => index)
       : [scale.min, (scale.min + scale.max) / 2, scale.max]
