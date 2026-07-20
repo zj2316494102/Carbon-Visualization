@@ -12,7 +12,8 @@
         "co2": { "files": "data/raw/co2/singapore_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/singapore/poi_grid_*.csv" },
         "weather": { "files": "data/raw/weather/singapore/*.csv" },
-        "viirs": { "files": "data/raw/viirs/singapore/*.csv" }
+        "viirs": { "files": "data/raw/viirs/singapore/*.csv" },
+        "modis": { "files": "data/raw/modis/singapore/*.csv" }
       }
     },
     {
@@ -25,7 +26,8 @@
         "co2": { "files": "data/raw/co2/new_york_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/new_york/poi_grid_*.csv" },
         "weather": { "files": "data/raw/weather/new_york/*.csv" },
-        "viirs": { "files": "data/raw/viirs/new_york/*.csv" }
+        "viirs": { "files": "data/raw/viirs/new_york/*.csv" },
+        "modis": { "files": "data/raw/modis/new_york/*.csv" }
       }
     },
     {
@@ -38,7 +40,8 @@
         "co2": { "files": "data/raw/co2/tokyo_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/tokyo/poi_grid_*.csv" },
         "weather": { "files": "data/raw/weather/tokyo/*.csv" },
-        "viirs": { "files": "data/raw/viirs/tokyo/*.csv" }
+        "viirs": { "files": "data/raw/viirs/tokyo/*.csv" },
+        "modis": { "files": "data/raw/modis/tokyo/*.csv" }
       }
     },
     {
@@ -51,7 +54,8 @@
         "co2": { "files": "data/raw/co2/chicago_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/chicago/poi_grid_*.csv" },
         "weather": { "files": "data/raw/weather/chicago/*.csv" },
-        "viirs": { "files": "data/raw/viirs/chicago/*.csv" }
+        "viirs": { "files": "data/raw/viirs/chicago/*.csv" },
+        "modis": { "files": "data/raw/modis/chicago/*.csv" }
       }
     }
   ],
@@ -85,7 +89,7 @@
         "spatial_rule": "区域月度值为区域内全部网格 emission_tc 求和。",
         "annual_rule": "年度值为当年 12 个月排放量求和。"
       },
-      "color_scale": { "quantile": 0.99, "fixed_min": 0, "minimum_max": 0, "zero_color": null, "integer_ticks_below": 0, "css_class": "" }
+      "color_scale": { "transform": "log1p", "fixed_min": 0, "clip_high": 0.99, "palette": ["#fffbd1", "#ffc45c", "#f05a3c", "#a50026"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true, "enhanced_transform": "linear" } }
     },
     "poi": {
       "label": "POI 数量",
@@ -116,7 +120,7 @@
         "spatial_rule": "区域值为所选类别在全部网格中的数量之和。",
         "annual_rule": "POI 是时点存量，年度视图取每年 12 月快照，不累加 12 个月。"
       },
-      "color_scale": { "quantile": 0.99, "fixed_min": 0, "minimum_max": 5, "zero_color": "#f0f3f1", "integer_ticks_below": 8, "css_class": "poi-scale" },
+      "color_scale": { "transform": "log1p", "fixed_min": 1, "positive_domain": true, "clip_high": 0.99, "minimum_max": 5, "zero_color": "#f0f3f1", "integer_ticks_below": 8, "palette": ["#fff8c9", "#ffc857", "#ef633f", "#a70b2d"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } },
       "categories": [
         { "id": "poi_total", "label": "全部类别" },
         { "id": "poi_restaurant", "label": "餐饮" },
@@ -178,31 +182,92 @@
           "id": "temperature_2m_mean_c", "label": "平均温度", "short_label": "温度", "unit": "°C",
           "regional_unit": "°C", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
           "annual_aggregation": "mean", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
-          "legend_label": "月均 2 m 气温", "palette": "temperature", "show_rate": false, "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-temperature" }
+          "legend_label": "月均 2 m 气温", "show_rate": false, "color_scale": { "transform": "linear", "clip_low": 0, "clip_high": 1, "center": "median", "palette": ["#245ba6", "#d9edf3", "#f7f4df", "#ef7b55", "#9d1735"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } }
         },
         {
           "id": "relative_humidity_2m_mean_pct", "label": "相对湿度", "short_label": "湿度", "unit": "%",
           "regional_unit": "%", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
           "annual_aggregation": "mean", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
-          "legend_label": "月均 2 m 相对湿度", "palette": "humidity", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-humidity" }
+          "legend_label": "月均 2 m 相对湿度", "color_scale": { "transform": "linear", "clip_low": 0, "clip_high": 1, "palette": ["#edf7f9", "#a8d8e5", "#3998bd", "#124f78"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } }
         },
         {
           "id": "precipitation_sum_mm", "label": "累计降水", "short_label": "降水", "unit": "mm",
           "regional_unit": "mm", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
           "annual_aggregation": "sum", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
-          "legend_label": "月累计降水量", "palette": "precipitation", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-precipitation" }
+          "legend_label": "月累计降水量", "color_scale": { "transform": "sqrt", "clip_low": 0, "clip_high": 0.99, "palette": ["#eef9f7", "#9bd5d1", "#3192b4", "#174a78"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } }
         },
         {
           "id": "wind_speed_10m_max_kmh", "label": "最大风速", "short_label": "风速", "unit": "km/h",
           "regional_unit": "km/h", "regional_factor": 1, "spatial_aggregation": "max_unique_reference",
           "annual_aggregation": "max", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
-          "legend_label": "月最大 10 m 风速", "palette": "wind", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-wind" }
+          "legend_label": "月最大 10 m 风速", "color_scale": { "transform": "linear", "clip_low": 0, "clip_high": 1, "palette": ["#f3f0f8", "#c9bde0", "#8b70b4", "#47266f"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } }
         },
         {
           "id": "shortwave_radiation_sum_mj_m2", "label": "短波辐射", "short_label": "辐射", "unit": "MJ/m²",
           "regional_unit": "MJ/m²", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
           "annual_aggregation": "sum", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
-          "legend_label": "月累计短波辐射", "palette": "radiation", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-radiation" }
+          "legend_label": "月累计短波辐射", "color_scale": { "transform": "linear", "clip_low": 0, "clip_high": 1, "palette": ["#fff8cb", "#f6cf62", "#e77c32", "#a83228"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": true } }
+        }
+      ]
+    },
+    "modis": {
+      "label": "MODIS 遥感特征",
+      "adapter": "remote_sensing",
+      "period_column": "period",
+      "period_format": "%Y%m",
+      "temporal_kind": "metric_defined",
+      "unit": "",
+      "regional_unit": "",
+      "regional_factor": 1,
+      "value_precision": 3,
+      "regional_precision": 3,
+      "change_precision": 3,
+      "map_title": "空间遥感特征分布",
+      "legend_label": "网格遥感值",
+      "source_label": "Planetary Computer MOD13Q1 monthly remote sensing",
+      "footer_source": "Planetary Computer MOD13Q1 250 m 像元按月合成，并聚合至 1 km 网格",
+      "footer_unit": "NDVI、EVI 与反射率均保留源数据归一化数值",
+      "show_share": false,
+      "trend_subtitle": "基于有效 250 m 像元加权统计",
+      "defaultCategory": "modis_ndvi_mean",
+      "overview": true,
+      "methodology": {
+        "summary": "Planetary Computer MOD13Q1 250 m 遥感像元按月合成后聚合至 1 km 网格。地图展示网格有效像元均值，区域趋势按各网格有效像元数加权；云遮、水体等造成无有效像元时按缺测显示，不作为零值参与统计。",
+        "fields": [
+          { "name": "modis_ndvi_mean", "meaning": "归一化植被指数 NDVI 网格均值，理论范围约 -1 至 1" },
+          { "name": "modis_evi_mean", "meaning": "增强植被指数 EVI 网格均值" },
+          { "name": "modis_red_reflectance_mean", "meaning": "红波段归一化反射率网格均值" },
+          { "name": "modis_nir_reflectance_mean", "meaning": "近红外波段归一化反射率网格均值" },
+          { "name": "modis_*_mean_pixel_count", "meaning": "参与对应指标网格均值计算的有效 250 m 像元数" },
+          { "name": "source / start_date / end_date", "meaning": "遥感数据来源及月度统计起止日期" }
+        ],
+        "spatial_rule": "区域月度值按有效像元数加权：Σ(网格均值 × 有效像元数) ÷ Σ有效像元数。",
+        "annual_rule": "四项指标的年度值均取当年 12 个月有效观测均值；年度地图中缺失月份不作为零值参与计算。"
+      },
+      "metrics": [
+        {
+          "id": "modis_ndvi_mean", "pixel_count_column": "modis_ndvi_mean_pixel_count", "label": "NDVI", "short_label": "NDVI", "unit": "指数",
+          "regional_unit": "指数", "regional_factor": 1, "spatial_aggregation": "weighted_mean_pixels", "annual_aggregation": "mean",
+          "value_precision": 3, "regional_precision": 3, "change_precision": 3, "show_rate": false,
+          "legend_label": "NDVI 网格均值", "color_scale": { "transform": "linear", "clip_low": 0.01, "clip_high": 0.99, "center": "median", "palette": ["#8d5a35", "#e7d9a7", "#d9edc2", "#65a94c", "#155b32"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": false } }
+        },
+        {
+          "id": "modis_evi_mean", "pixel_count_column": "modis_evi_mean_pixel_count", "label": "EVI", "short_label": "EVI", "unit": "指数",
+          "regional_unit": "指数", "regional_factor": 1, "spatial_aggregation": "weighted_mean_pixels", "annual_aggregation": "mean",
+          "value_precision": 3, "regional_precision": 3, "change_precision": 3, "show_rate": false,
+          "legend_label": "EVI 网格均值", "color_scale": { "transform": "linear", "clip_low": 0.01, "clip_high": 0.99, "center": "median", "palette": ["#7d5639", "#eadbb1", "#dcefc5", "#6bae4d", "#195f36"], "auto_contrast": { "enabled": true, "target_delta": 0.03, "static_ratio": 0.8, "max_clip_each_side": 0.15, "endpoint_palette": false } }
+        },
+        {
+          "id": "modis_red_reflectance_mean", "pixel_count_column": "modis_red_reflectance_mean_pixel_count", "label": "红光反射率", "short_label": "红光", "unit": "反射率",
+          "regional_unit": "反射率", "regional_factor": 1, "spatial_aggregation": "weighted_mean_pixels", "annual_aggregation": "mean",
+          "value_precision": 3, "regional_precision": 3, "change_precision": 3, "show_rate": false,
+          "legend_label": "红光反射率均值", "color_scale": { "transform": "linear", "clip_low": 0.01, "clip_high": 0.99, "palette": ["#fff4e8", "#f3b9a6", "#d9685f", "#8f1d32"] }
+        },
+        {
+          "id": "modis_nir_reflectance_mean", "pixel_count_column": "modis_nir_reflectance_mean_pixel_count", "label": "近红外反射率", "short_label": "近红外", "unit": "反射率",
+          "regional_unit": "反射率", "regional_factor": 1, "spatial_aggregation": "weighted_mean_pixels", "annual_aggregation": "mean",
+          "value_precision": 3, "regional_precision": 3, "change_precision": 3, "show_rate": false,
+          "legend_label": "近红外反射率均值", "color_scale": { "transform": "linear", "clip_low": 0.01, "clip_high": 0.99, "palette": ["#f7f2e7", "#d7c7dd", "#8e75ad", "#42235f"] }
         }
       ]
     },
@@ -228,7 +293,7 @@
       "defaultCategory": "ntl_radiance_mean",
       "quality": true,
       "methodology": {
-        "summary": "HKU-VIIRS 500 m 月度夜光影像聚合至 1 km 网格。默认地图使用 log1p(平均辐亮度) 缓解右偏分布，但区域统计和详情保留原始物理量。",
+        "summary": "HKU-VIIRS 500 m 月度夜光影像聚合至 1 km 网格。平均、最大和总辐亮度地图分别按地区与指标使用固定全时段范围，并以 log1p 连续归一化缓解右偏分布；区域统计、趋势和详情保留原始物理量。",
         "fields": [
           { "name": "ntl_radiance_mean", "meaning": "网格内有效像元平均辐亮度，单位 nW/(cm²·sr)" },
           { "name": "ntl_radiance_max", "meaning": "网格内有效像元最大辐亮度" },
@@ -236,7 +301,7 @@
           { "name": "ntl_valid_pixel_count", "meaning": "参与统计的 500 m 有效像元数量" },
           { "name": "ntl_is_missing", "meaning": "是否缺失：1 为无有效观测" },
           { "name": "ntl_is_imputed", "meaning": "是否由其他月份中位数填补" },
-          { "name": "ntl_log_radiance_mean", "meaning": "log1p(平均辐亮度)，仅用于地图视觉表达" },
+          { "name": "ntl_log_radiance_mean", "meaning": "源数据附带的 log1p(平均辐亮度)校验字段；当前地图由三个原始辐亮度指标统一执行 log1p 变换" },
           { "name": "source / start_date / end_date", "meaning": "数据来源及月度统计起止日期" }
         ],
         "spatial_rule": "区域平均辐亮度按有效像元加权：Σ辐亮度总和 ÷ Σ有效像元数；最大值取区域网格最大值；总辐亮度取全部网格总和。",
@@ -246,21 +311,21 @@
         {
           "id": "ntl_radiance_mean", "label": "平均辐亮度", "short_label": "平均", "unit": "nW/(cm²·sr)",
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
-          "spatial_aggregation": "weighted_mean_pixels", "map_transform": "log1p", "map_value_column": "ntl_log_radiance_mean",
+          "spatial_aggregation": "weighted_mean_pixels",
           "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "log1p 平均辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
+          "legend_label": "log1p 平均辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "transform": "log1p", "tick_values": "transformed", "interpolation": "rgb", "fixed_min": 0, "clip_high": 0.99, "palette": ["#14181d", "#1f2c36", "#655b43", "#dd9d43", "#fff8da"], "map_theme": "nightlights", "renderer": "canvas-nightlights", "glow": { "response_power": 2.2, "broad_power_multiplier": 1.6, "max_opacity": 0.9 } }
         },
         {
           "id": "ntl_radiance_max", "label": "最大辐亮度", "short_label": "最大", "unit": "nW/(cm²·sr)",
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "max",
           "spatial_aggregation": "max", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "最大辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
+          "legend_label": "log1p 最大辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "transform": "log1p", "tick_values": "transformed", "interpolation": "rgb", "fixed_min": 0, "clip_high": 0.99, "palette": ["#14181d", "#1f2c36", "#655b43", "#dd9d43", "#fff8da"], "map_theme": "nightlights", "renderer": "canvas-nightlights", "glow": { "response_power": 2.2, "broad_power_multiplier": 1.6, "max_opacity": 0.9 } }
         },
         {
           "id": "ntl_radiance_sum", "label": "总辐亮度", "short_label": "总和", "unit": "nW/(cm²·sr)",
           "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
           "spatial_aggregation": "sum", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
-          "legend_label": "网格总辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale", "map_theme": "nightlights", "glow": { "high_threshold": 0.85, "peak_threshold": 0.98 } }
+          "legend_label": "log1p 网格总辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "transform": "log1p", "tick_values": "transformed", "interpolation": "rgb", "fixed_min": 0, "clip_high": 0.99, "palette": ["#14181d", "#1f2c36", "#655b43", "#dd9d43", "#fff8da"], "map_theme": "nightlights", "renderer": "canvas-nightlights", "glow": { "response_power": 2.2, "broad_power_multiplier": 1.6, "max_opacity": 0.9 } }
         }
       ]
     }

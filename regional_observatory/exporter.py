@@ -111,24 +111,7 @@ def build_wide_metrics(records, topic: dict, join_column: str, cell_ids: list[st
         regional_values[metric["id"]] = series.reindex(periods).round(6).tolist()
 
     categories = [
-        {
-            "id": metric["id"],
-            "label": metric["label"],
-            "short_label": metric["short_label"],
-            "unit": metric["unit"],
-            "regional_unit": metric["regional_unit"],
-            "regional_factor": metric["regional_factor"],
-            "spatial_aggregation": metric["spatial_aggregation"],
-            "annual_aggregation": metric["annual_aggregation"],
-            "value_precision": metric["value_precision"],
-            "regional_precision": metric["regional_precision"],
-            "change_precision": metric["change_precision"],
-            "legend_label": metric["legend_label"],
-            "legend_unit": metric.get("legend_unit", metric["unit"]),
-            "palette": metric["palette"],
-            "show_rate": metric.get("show_rate", True),
-            "color_scale": metric["color_scale"],
-        }
+        {**metric, "legend_unit": metric.get("legend_unit", metric["unit"]), "show_rate": metric.get("show_rate", True)}
         for metric in metrics
     ]
     return {
@@ -141,31 +124,22 @@ def build_wide_metrics(records, topic: dict, join_column: str, cell_ids: list[st
 
 
 def build_nightlights(records, topic: dict, join_column: str, cell_ids: list[str], periods) -> dict:
-    import numpy as np
-
     metrics = topic["metrics"]
     required = {
         "ntl_radiance_mean", "ntl_radiance_max", "ntl_radiance_sum",
         "ntl_valid_pixel_count", "ntl_is_missing", "ntl_is_imputed",
-        "ntl_log_radiance_mean", "source", "start_date", "end_date",
+        "source", "start_date", "end_date",
     }
     missing = required - set(records.columns)
     if missing:
         raise ValueError(f"VIIRS 数据缺少字段：{', '.join(sorted(missing))}")
     if not records["ntl_is_missing"].isin([0, 1]).all() or not records["ntl_is_imputed"].isin([0, 1]).all():
         raise ValueError("VIIRS 缺失或填补标记必须为 0/1。")
-    expected_log = np.log1p(records["ntl_radiance_mean"].clip(lower=0))
-    if not np.allclose(records["ntl_log_radiance_mean"], expected_log):
-        raise ValueError("VIIRS 对数辐亮度与 log1p(平均辐亮度) 不一致。")
-
     values = {}
-    map_values = {}
     regional_values = {}
     for metric in metrics:
         metric_id = metric["id"]
         values[metric_id] = matrix(records, metric_id, join_column, cell_ids, periods).round(6).values.tolist()
-        map_column = metric.get("map_value_column", metric_id)
-        map_values[metric_id] = matrix(records, map_column, join_column, cell_ids, periods).round(6).values.tolist()
         grouped = records.groupby("_time")
         aggregation = metric["spatial_aggregation"]
         if aggregation == "weighted_mean_pixels":
@@ -194,15 +168,70 @@ def build_nightlights(records, topic: dict, join_column: str, cell_ids: list[str
             "startDate": str(current["start_date"].iloc[0]),
             "endDate": str(current["end_date"].iloc[0]),
         })
-    public_metrics = [{key: value for key, value in metric.items() if key != "map_value_column"} for metric in metrics]
     return {
-        "categories": public_metrics,
+        "categories": metrics,
         "defaultCategory": topic["defaultCategory"],
         "values": values,
-        "mapValues": map_values,
         "regionalValues": regional_values,
         "quality": quality,
         "periodQuality": period_quality,
+    }
+
+
+def build_remote_sensing(records, topic: dict, join_column: str, cell_ids: list[str], periods) -> dict:
+    """Build remote-sensing metrics with per-metric valid-pixel quality data."""
+    metrics = topic["metrics"]
+    required = {"source", "start_date", "end_date"}
+    for metric in metrics:
+        required.update({metric["id"], metric["pixel_count_column"]})
+    missing = required - set(records.columns)
+    if missing:
+        raise ValueError(f"Remote-sensing data is missing fields: {', '.join(sorted(missing))}")
+
+    values = {}
+    regional_values = {}
+    metric_quality = {}
+    period_quality = {}
+    for metric in metrics:
+        metric_id = metric["id"]
+        count_column = metric["pixel_count_column"]
+        valid = records[count_column].fillna(0).gt(0) & records[metric_id].notna()
+        cleaned = records.assign(_metric_value=records[metric_id].where(valid))
+        value_matrix = cleaned.pivot(index=join_column, columns="_time", values="_metric_value")
+        value_matrix = value_matrix.reindex(index=cell_ids, columns=periods)
+        export_values = value_matrix.round(6).astype(object).where(value_matrix.notna(), None)
+        values[metric_id] = export_values.values.tolist()
+
+        count_matrix = records.pivot(index=join_column, columns="_time", values=count_column)
+        count_matrix = count_matrix.reindex(index=cell_ids, columns=periods).fillna(0).astype(int)
+        metric_quality[metric_id] = {"validPixelCount": count_matrix.values.tolist()}
+
+        weighted = cleaned.assign(_weighted=cleaned["_metric_value"] * cleaned[count_column])
+        grouped = weighted.groupby("_time")
+        numerator = grouped["_weighted"].sum(min_count=1)
+        denominator = grouped[count_column].sum()
+        regional_values[metric_id] = (numerator / denominator).reindex(periods).round(6).tolist()
+
+        entries = []
+        for period in periods:
+            current = cleaned.loc[cleaned["_time"] == period]
+            entries.append({
+                "missingCount": int(current["_metric_value"].isna().sum()),
+                "imputedCount": 0,
+                "validPixelCount": int(current.loc[current["_metric_value"].notna(), count_column].sum()),
+                "source": str(current["source"].iloc[0]),
+                "startDate": str(current["start_date"].iloc[0]),
+                "endDate": str(current["end_date"].iloc[0]),
+            })
+        period_quality[metric_id] = entries
+
+    return {
+        "categories": metrics,
+        "defaultCategory": topic["defaultCategory"],
+        "values": values,
+        "regionalValues": regional_values,
+        "metricQuality": metric_quality,
+        "periodQualityByMetric": period_quality,
     }
 
 
@@ -211,6 +240,7 @@ ADAPTERS = {
     "wide_categories": build_wide_categories,
     "wide_metrics": build_wide_metrics,
     "nightlights": build_nightlights,
+    "remote_sensing": build_remote_sensing,
 }
 
 

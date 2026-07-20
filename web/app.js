@@ -26,11 +26,11 @@
   }
   let monthlyPeriods = data.topics[state.topic].periods
   let monthlyValues = data.topics[state.topic].values
-  let monthlyMapValues = monthlyValues
   let monthYears = [...new Set(monthlyPeriods.map((period) => period.slice(0, 4)))]
   let allMonthlyTotals = monthlyPeriods.map((_, index) => monthlyValues.reduce((sum, row) => sum + row[index], 0))
 
   const el = (id) => document.getElementById(id)
+  const mapCanvas = el('mapCanvas')
   const mapSvg = el('mapSvg')
   const gridLayer = el('gridLayer')
   const tooltip = el('tooltip')
@@ -39,15 +39,9 @@
   const playButton = el('playButton')
   const replayOverlay = el('replayOverlay')
   const methodDialog = el('methodDialog')
-  const palettes = {
-    default: [[255, 255, 204], [255, 237, 160], [254, 178, 76], [252, 78, 42], [189, 0, 38]],
-    temperature: [[50, 100, 168], [220, 236, 244], [247, 244, 223], [227, 90, 63], [158, 27, 50]],
-    humidity: [[237, 246, 251], [185, 221, 236], [101, 175, 208], [36, 116, 168], [18, 69, 109]],
-    precipitation: [[238, 248, 247], [191, 227, 223], [112, 193, 198], [39, 125, 161], [25, 74, 120]],
-    wind: [[242, 239, 248], [208, 196, 228], [161, 139, 196], [116, 86, 158], [67, 38, 109]],
-    radiation: [[255, 247, 204], [248, 214, 109], [238, 168, 60], [222, 107, 45], [169, 54, 38]],
-    nightlights: [[20, 24, 29], [31, 44, 54], [101, 91, 67], [221, 157, 67], [255, 248, 218]],
-  }
+  const colorScaleCache = new Map()
+  const canvasLayers = [document.createElement('canvas'), document.createElement('canvas')]
+  let canvasPaths = []
 
   function periods() {
     return state.mode === 'month' ? monthlyPeriods : monthYears
@@ -80,7 +74,6 @@
     monthlyPeriods = current.periods
     if (current.categories && !state.category) state.category = current.defaultCategory
     monthlyValues = current.categories ? current.values[state.category] : current.values
-    monthlyMapValues = current.mapValues?.[state.category] || monthlyValues
     monthYears = [...new Set(monthlyPeriods.map((period) => period.slice(0, 4)))]
     allMonthlyTotals = monthlyPeriods.map((_, index) => monthlyValues.reduce((sum, row) => sum + row[index], 0))
   }
@@ -95,10 +88,12 @@
   }
 
   function aggregateIndices(row, indices, aggregation) {
+    const values = indices.map((index) => row[index]).filter(Number.isFinite)
+    if (!values.length) return null
     if (aggregation === 'snapshot') return row[indices.at(-1)]
-    if (aggregation === 'mean') return indices.reduce((sum, index) => sum + row[index], 0) / indices.length
-    if (aggregation === 'max') return Math.max(...indices.map((index) => row[index]))
-    return indices.reduce((sum, index) => sum + row[index], 0)
+    if (aggregation === 'mean') return values.reduce((sum, value) => sum + value, 0) / values.length
+    if (aggregation === 'max') return Math.max(...values)
+    return values.reduce((sum, value) => sum + value, 0)
   }
 
   function frameValues(frame = state.frame) {
@@ -108,9 +103,7 @@
   }
 
   function frameMapValues(frame = state.frame) {
-    if (state.mode === 'month') return monthlyMapValues.map((row) => row[frame])
-    const raw = frameValues(frame)
-    return category()?.map_transform === 'log1p' ? raw.map((value) => Math.log1p(Math.max(0, value))) : raw
+    return frameValues(frame)
   }
 
   function seriesForCell(cellIndex) {
@@ -128,37 +121,14 @@
     return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value)
   }
 
-  function percentile(values, quantile) {
-    const sorted = [...values].sort((a, b) => a - b)
-    const index = Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * quantile))
-    return sorted[index] ?? 0
-  }
-
-  function color(value, min, max) {
-    const stops = palettes[category()?.palette] || palettes.default
-    const position = Math.max(0, Math.min(1, (value - min) / Math.max(1e-12, max - min))) * (stops.length - 1)
-    const lower = Math.floor(position)
-    const upper = Math.min(stops.length - 1, lower + 1)
-    const ratio = position - lower
-    const rgb = stops[lower].map((channel, index) => Math.round(channel + (stops[upper][index] - channel) * ratio))
-    return `rgb(${rgb.join(',')})`
-  }
-
-  function mapColor(value, min, max) {
-    const scale = setting('color_scale')
-    if (value === 0 && scale.zero_color) return scale.zero_color
-    return color(value, min, max)
-  }
-
-  function colorScaleRange() {
-    const values = state.mode === 'month'
-      ? monthlyMapValues.flat()
-      : monthYears.flatMap((_, index) => frameMapValues(index))
-    const scale = setting('color_scale')
-    const min = scale.fixed_min ?? percentile(values, scale.quantile_low ?? 0)
-    const quantileMax = percentile(values, scale.quantile_high ?? scale.quantile ?? .99)
-    const max = Math.max(scale.minimum_max || quantileMax, quantileMax)
-    return { min, max: max === min ? min + 1 : max }
+  function visualScale() {
+    const cacheKey = `${data.meta.id}:${state.topic}:${state.category || ''}:${state.mode}`
+    if (colorScaleCache.has(cacheKey)) return colorScaleCache.get(cacheKey)
+    const frames = periods().map((_, index) => frameMapValues(index))
+    const values = frames.flat()
+    const scale = window.VisualEncoding.createScale(setting('color_scale'), values, frames)
+    colorScaleCache.set(cacheKey, scale)
+    return scale
   }
 
   function projectCoordinates() {
@@ -186,6 +156,7 @@
     selectedOutline.removeAttribute('d')
     const projection = projectCoordinates()
     const fragment = document.createDocumentFragment()
+    canvasPaths = []
     data.features.forEach((feature, index) => {
       const path = document.createElementNS(NS, 'path')
       path.setAttribute('d', projection.path(feature.geometry))
@@ -199,6 +170,7 @@
         tooltip.hidden = true
       })
       path.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') selectCell(index) })
+      canvasPaths.push(typeof Path2D === 'function' ? new Path2D(path.getAttribute('d')) : null)
       fragment.appendChild(path)
     })
     gridLayer.appendChild(fragment)
@@ -229,12 +201,12 @@
     el('mapTitle').textContent = topic().map_title
     el('legendLabel').textContent = `${setting('legend_label')}（${category()?.legend_unit || sourceUnit()}）`
     const scale = setting('color_scale')
-    el('legendBar').className = scale.css_class
+    el('legendBar').className = ''
     el('map').dataset.theme = scale.map_theme || ''
     el('cellUnit').textContent = sourceUnit()
     el('footerSource').textContent = topic().footer_source
     el('footerUnit').textContent = topic().footer_unit
-    el('categoryLabel').textContent = topic().overview ? '气象指标' : '细分类别'
+    el('categoryLabel').textContent = topic().overview ? '观测指标' : '细分类别'
     el('currentMetricLabel').textContent = topic().regionalValues ? '当前区域值' : '当前时段总量'
     el('maxMetricLabel').textContent = topic().regionalValues ? '当前最高网格' : '当前最高网格'
     if (state.selected === null) {
@@ -252,7 +224,7 @@
 
   function spatialRuleLabel() {
     const aggregation = category()?.spatial_aggregation
-    return { mean_unique_reference: '去重 API 参考点空间均值', max_unique_reference: '去重 API 参考点空间最大值' }[aggregation] || topic().methodology?.spatial_rule || '--'
+    return { mean_unique_reference: '去重 API 参考点空间均值', max_unique_reference: '去重 API 参考点空间最大值', weighted_mean_pixels: '按有效像元数加权均值' }[aggregation] || topic().methodology?.spatial_rule || '--'
   }
 
   function renderMethodology() {
@@ -326,7 +298,8 @@
     if (state.hoveredCell === null || tooltip.hidden) return
     const feature = data.features[state.hoveredCell]
     const value = frameValues()[state.hoveredCell]
-    tooltip.innerHTML = `<strong>${feature.id}</strong>${periods()[state.frame]}<br>${formatNumber(value, setting('value_precision'))} ${sourceUnit()}`
+    const display = Number.isFinite(value) ? `${formatNumber(value, setting('value_precision'))} ${sourceUnit()}` : '无有效观测'
+    tooltip.innerHTML = `<strong>${feature.id}</strong>${periods()[state.frame]}<br>${display}`
   }
 
   function moveTooltip(event) {
@@ -371,14 +344,14 @@
     const feature = data.features[state.selected]
     const values = frameValues()
     const value = values[state.selected]
-    const sorted = [...values].sort((a, b) => b - a)
+    const sorted = values.filter(Number.isFinite).sort((a, b) => b - a)
     const firstRank = sorted.findIndex((item) => item === value) + 1
     const tiedCount = sorted.filter((item) => item === value).length
     el('detailPeriod').textContent = periods()[state.frame]
-    el('cellValue').textContent = formatNumber(value, setting('value_precision'))
+    el('cellValue').textContent = Number.isFinite(value) ? formatNumber(value, setting('value_precision')) : '--'
     el('cellLon').textContent = Number(feature.lon).toFixed(5) + '°E'
     el('cellLat').textContent = Number(feature.lat).toFixed(5) + '°N'
-    el('cellRank').textContent = `第 ${firstRank} / ${values.length}${tiedCount > 1 ? `（并列 ${tiedCount}）` : ''}`
+    el('cellRank').textContent = Number.isFinite(value) ? `第 ${firstRank} / ${sorted.length}${tiedCount > 1 ? `（并列 ${tiedCount}）` : ''}` : '无有效观测'
     const reference = topic().references?.[state.selected]
     el('referenceLonItem').hidden = !reference
     el('referenceLatItem').hidden = !reference
@@ -387,8 +360,9 @@
       el('referenceLon').textContent = Number(reference[1]).toFixed(5) + '°'
     }
     const quality = topic().quality
-    el('validPixelItem').hidden = !quality
-    el('qualityItem').hidden = !quality
+    const metricQuality = topic().metricQuality?.[state.category]
+    el('validPixelItem').hidden = !quality && !metricQuality
+    el('qualityItem').hidden = !quality && !metricQuality
     if (quality) {
       const periodIndex = state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)
       const valid = topic().quality.ntl_valid_pixel_count[state.selected][periodIndex]
@@ -396,8 +370,13 @@
       const imputed = topic().quality.ntl_is_imputed[state.selected][periodIndex]
       el('validPixelCount').textContent = `${valid} 个 500 m 像元`
       el('cellQuality').textContent = missing ? '缺失' : imputed ? '填补数据' : '原始观测'
+    } else if (metricQuality) {
+      const indices = state.mode === 'month' ? [state.frame] : yearIndices(monthYears[state.frame])
+      const valid = indices.reduce((sum, index) => sum + metricQuality.validPixelCount[state.selected][index], 0)
+      el('validPixelCount').textContent = `${valid} 个 250 m 像元${state.mode === 'year' ? '（年度合计）' : ''}`
+      el('cellQuality').textContent = Number.isFinite(value) ? '有效观测' : '无有效像元'
     }
-    const nightlights = Boolean(topic().mapValues && topic().quality)
+    const nightlights = Boolean(topic().quality?.ntl_valid_pixel_count)
     for (const id of ['ntlMeanItem', 'ntlMaxItem', 'ntlSumItem', 'ntlLogItem']) el(id).hidden = !nightlights
     if (nightlights) {
       const metricValue = (metricId) => {
@@ -410,21 +389,23 @@
       el('ntlSum').textContent = formatNumber(metricValue('ntl_radiance_sum'), 2)
       el('ntlLog').textContent = formatNumber(Math.log1p(Math.max(0, mean)), 3)
     }
-    el('dataSourceItem').hidden = !nightlights
-    el('dateRangeItem').hidden = !nightlights
-    if (nightlights) {
+    const hasPeriodDetails = nightlights || Boolean(topic().periodQualityByMetric)
+    el('dataSourceItem').hidden = !hasPeriodDetails
+    el('dateRangeItem').hidden = !hasPeriodDetails
+    if (hasPeriodDetails) {
       const index = state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)
-      const periodQuality = topic().periodQuality[index]
+      const periodQuality = topic().periodQuality?.[index] || topic().periodQualityByMetric[state.category][index]
       el('dataSourceValue').textContent = periodQuality.source
       el('dateRangeValue').textContent = state.mode === 'month' ? `${periodQuality.startDate} 至 ${periodQuality.endDate}` : `${monthYears[state.frame]} 年度`
     }
   }
 
   function currentQuality() {
-    if (!topic().periodQuality) return null
-    if (state.mode === 'month') return topic().periodQuality[state.frame]
+    const periodQuality = topic().periodQuality || topic().periodQualityByMetric?.[state.category]
+    if (!periodQuality) return null
+    if (state.mode === 'month') return periodQuality[state.frame]
     const indices = yearIndices(monthYears[state.frame])
-    const entries = indices.map((index) => topic().periodQuality[index])
+    const entries = indices.map((index) => periodQuality[index])
     return {
       imputedCount: Math.max(...entries.map((item) => item.imputedCount)),
       missingCount: Math.max(...entries.map((item) => item.missingCount)),
@@ -451,30 +432,114 @@
     }
   }
 
+  function prepareCanvas() {
+    const rect = mapSvg.getBoundingClientRect()
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const width = Math.max(1, Math.round(rect.width * dpr))
+    const height = Math.max(1, Math.round(rect.height * dpr))
+    if (mapCanvas.width !== width || mapCanvas.height !== height) {
+      mapCanvas.width = width
+      mapCanvas.height = height
+    }
+    for (const canvas of canvasLayers) {
+      const layerWidth = Math.max(1, Math.round(rect.width))
+      const layerHeight = Math.max(1, Math.round(rect.height))
+      if (canvas.width !== layerWidth || canvas.height !== layerHeight) {
+        canvas.width = layerWidth
+        canvas.height = layerHeight
+      }
+    }
+    const fit = Math.min(rect.width / 1000, rect.height / 620)
+    return {
+      dpr,
+      width,
+      height,
+      fit,
+      offsetX: (rect.width - 1000 * fit) / 2,
+      offsetY: (rect.height - 620 * fit) / 2,
+    }
+  }
+
+  function setCanvasTransform(context, layout) {
+    const scale = layout.dpr * layout.fit
+    context.setTransform(
+      scale * state.zoom, 0, 0, scale * state.zoom,
+      layout.dpr * (layout.offsetX + layout.fit * state.panX),
+      layout.dpr * (layout.offsetY + layout.fit * state.panY),
+    )
+  }
+
+  function drawNightlights(cells, scale, glow) {
+    if (!mapCanvas.getContext || canvasPaths.some((path) => !path)) return false
+    const layout = prepareCanvas()
+    const broad = canvasLayers[0].getContext('2d')
+    const soft = canvasLayers[1].getContext('2d')
+    const output = mapCanvas.getContext('2d')
+    for (const context of [broad, soft, output]) {
+      context.setTransform(1, 0, 0, 1, 0, 0)
+      context.clearRect(0, 0, layout.width, layout.height)
+    }
+    setCanvasTransform(broad, { ...layout, dpr: 1 })
+    setCanvasTransform(soft, { ...layout, dpr: 1 })
+    cells.forEach(({ value, fill, missing }, index) => {
+      if (missing) return
+      const brightness = scale.normalize(value)
+      soft.fillStyle = fill
+      soft.globalAlpha = Math.pow(brightness, glow.response_power) * glow.max_opacity * .72
+      soft.fill(canvasPaths[index])
+      broad.fillStyle = fill
+      broad.globalAlpha = Math.pow(brightness, glow.response_power * glow.broad_power_multiplier) * glow.max_opacity * .42
+      broad.fill(canvasPaths[index])
+    })
+    output.setTransform(1, 0, 0, 1, 0, 0)
+    output.filter = `blur(${Math.max(2, layout.dpr * 5)}px)`
+    output.drawImage(canvasLayers[0], 0, 0, layout.width, layout.height)
+    output.filter = `blur(${Math.max(1, layout.dpr * 2)}px)`
+    output.drawImage(canvasLayers[1], 0, 0, layout.width, layout.height)
+    output.filter = 'none'
+    setCanvasTransform(output, layout)
+    output.globalAlpha = 1
+    cells.forEach(({ fill, missing }, index) => {
+      if (missing) return
+      output.fillStyle = fill
+      output.fill(canvasPaths[index])
+    })
+    output.setTransform(1, 0, 0, 1, 0, 0)
+    output.globalAlpha = 1
+    return true
+  }
+
   function updateMap() {
     const values = frameMapValues()
-    const scale = colorScaleRange()
+    const scale = visualScale()
     const scaleConfig = setting('color_scale')
     const glow = scaleConfig.glow
     const quality = topic().quality
     const qualityIndex = quality ? (state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)) : null
+    const cells = values.map((value, index) => {
+      const missing = !Number.isFinite(value) || (quality ? quality.ntl_is_missing[index][qualityIndex] === 1 : false)
+      return { value, missing, fill: missing ? '' : scale.color(value) }
+    })
+    const canvasRenderer = scaleConfig.renderer === 'canvas-nightlights' && glow
+    const canvasRendered = canvasRenderer && drawNightlights(cells, scale, glow)
+    el('map').classList.toggle('canvas-nightlights', Boolean(canvasRendered))
     Array.from(gridLayer.children).forEach((path, index) => {
-      const missing = quality ? quality.ntl_is_missing[index][qualityIndex] === 1 : false
-      const brightness = Math.max(0, Math.min(1, (values[index] - scale.min) / Math.max(1e-12, scale.max - scale.min)))
-      path.classList.toggle('missing-data', missing)
-      path.classList.toggle('ntl-high', !missing && glow && brightness >= glow.high_threshold && brightness < glow.peak_threshold)
-      path.classList.toggle('ntl-peak', !missing && glow && brightness >= glow.peak_threshold)
-      path.style.fill = missing ? '' : mapColor(values[index], scale.min, scale.max)
+      const { missing, fill } = cells[index]
+      if (path.classList.contains('missing-data') !== missing) path.classList.toggle('missing-data', missing)
+      if (!canvasRendered) path.style.fill = fill
     })
     const digits = setting('value_precision')
-    const ticks = scaleConfig.integer_ticks_below > 0 && scale.max <= scaleConfig.integer_ticks_below && scale.min >= 0
-      ? Array.from({ length: Math.floor(scale.max) + 1 }, (_, index) => index)
-      : [scale.min, (scale.min + scale.max) / 2, scale.max]
-    el('legendValues').replaceChildren(...ticks.map((value) => {
-      const tick = document.createElement('span')
-      tick.textContent = formatNumber(value, digits)
-      return tick
-    }))
+    const ticks = scale.ticks()
+    const legendKey = `${data.meta.id}:${state.topic}:${state.category || ''}:${state.mode}:${scale.min}:${scale.max}:${scale.center ?? ''}`
+    if (el('legendValues').dataset.key !== legendKey) {
+      el('legendValues').dataset.key = legendKey
+      el('legendBar').style.background = scale.gradient()
+      el('legendValues').replaceChildren(...ticks.map((value) => {
+        const tick = document.createElement('span')
+        tick.textContent = formatNumber(value, digits)
+        return tick
+      }))
+    }
     el('mapSubtitle').textContent = `${periods()[state.frame]} · ${topicLabel()} · ${data.meta.cellCount} 个 1 km 网格`
     updateQualityBadge()
     updateTooltip()
@@ -482,19 +547,20 @@
 
   function updateMetrics() {
     const values = frameValues()
-    const total = values.reduce((sum, value) => sum + value, 0)
+    const finiteValues = values.filter(Number.isFinite)
+    const total = finiteValues.reduce((sum, value) => sum + value, 0)
     const regionSeries = regionalSeries()
     const currentRegional = topic().regionalValues ? regionSeries[state.frame] : total
     const previous = state.frame > 0 ? regionSeries[state.frame - 1] : null
-    const max = Math.max(...values)
+    const max = finiteValues.length ? Math.max(...finiteValues) : null
     const maxIndex = values.indexOf(max)
     const displayTotal = currentRegional * setting('regional_factor')
     const displayUnit = setting('regional_unit')
     const changeDivisor = 1 / setting('regional_factor')
     el('totalValue').textContent = formatNumber(displayTotal, setting('regional_precision'))
     el('totalUnit').textContent = displayUnit
-    el('maxCell').textContent = data.features[maxIndex].id
-    el('maxValue').textContent = `${formatNumber(max, setting('value_precision'))} ${sourceUnit()}`
+    el('maxCell').textContent = maxIndex >= 0 ? data.features[maxIndex].id : '--'
+    el('maxValue').textContent = Number.isFinite(max) ? `${formatNumber(max, setting('value_precision'))} ${sourceUnit()}` : '--'
     if (previous === null) {
       el('changeValue').textContent = '--'
       el('changeRate').textContent = '首个观测时段'
@@ -517,17 +583,33 @@
     const margin = { top: 19, right: 13, bottom: 35, left: 49 }
     const innerWidth = width - margin.left - margin.right
     const innerHeight = height - margin.top - margin.bottom
-    const rawMax = Math.max(...values)
-    const rawMin = Math.min(...values)
+    const finiteValues = values.map((value) => Number.isFinite(value) ? value : null)
+    const observed = finiteValues.filter(Number.isFinite)
+    const rawMax = observed.length ? Math.max(...observed) : 0
+    const rawMin = observed.length ? Math.min(...observed) : 0
     const padding = Math.max((rawMax - rawMin) * .08, Math.max(Math.abs(rawMax), Math.abs(rawMin)) * .02, 1e-6)
     const max = rawMax + padding
     const min = rawMin - padding
     const x = (index) => margin.left + index / Math.max(1, values.length - 1) * innerWidth
     const y = (value) => margin.top + (max - value) / Math.max(1e-9, max - min) * innerHeight
-    const line = values.map((value, index) => `${index ? 'L' : 'M'}${x(index)},${y(value)}`).join('')
-    const visibleValues = values.slice(0, state.frame + 1)
-    const visibleLine = visibleValues.map((value, index) => `${index ? 'L' : 'M'}${x(index)},${y(value)}`).join('')
-    const visibleArea = `${visibleLine}L${x(state.frame)},${height - margin.bottom}L${x(0)},${height - margin.bottom}Z`
+    const pathFor = (series) => {
+      let open = false
+      return series.map((value, index) => {
+        if (value === null) {
+          open = false
+          return ''
+        }
+        const command = open ? 'L' : 'M'
+        open = true
+        return `${command}${x(index)},${y(value)}`
+      }).join('')
+    }
+    const line = pathFor(finiteValues)
+    const visibleValues = finiteValues.slice(0, state.frame + 1)
+    const visibleLine = pathFor(visibleValues)
+    const visibleArea = visibleValues.every(Number.isFinite)
+      ? `${visibleLine}L${x(state.frame)},${height - margin.bottom}L${x(0)},${height - margin.bottom}Z`
+      : ''
     const isCell = state.selected !== null
     const unit = isCell ? sourceUnit() : setting('regional_unit')
     const divisor = isCell ? 1 : 1 / setting('regional_factor')
@@ -540,9 +622,10 @@
     const labels = periods().map((period, index) => ({ period, index })).filter((_, index, list) => index === 0 || index === list.length - 1 || index % Math.max(1, Math.floor(list.length / 4)) === 0).map(({ period, index }) => `<text class="chart-axis" x="${x(index)}" y="${height - 10}" text-anchor="middle">${period}</text>`).join('')
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
     const currentValue = values[state.frame]
-    const currentLabel = `${formatNumber(currentValue / divisor, isCell ? setting('value_precision') : setting('regional_precision'))} ${unit}`
+    const currentLabel = Number.isFinite(currentValue) ? `${formatNumber(currentValue / divisor, isCell ? setting('value_precision') : setting('regional_precision'))} ${unit}` : '无有效观测'
     const imputedClass = currentQuality()?.imputedCount > 0 ? ' imputed' : ''
-    svg.innerHTML = `<defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#68a894" stop-opacity=".36"/><stop offset="1" stop-color="#68a894" stop-opacity=".02"/></linearGradient></defs>${grids}<path class="chart-future" d="${line}"/><path class="chart-area" d="${visibleArea}"/><path class="chart-line" d="${visibleLine}"/>${labels}<line class="chart-current-line" x1="${x(state.frame)}" y1="${margin.top}" x2="${x(state.frame)}" y2="${height - margin.bottom}"/><circle class="chart-point${imputedClass}" cx="${x(state.frame)}" cy="${y(currentValue)}" r="5"/><text class="chart-axis" x="10" y="15">${unit}</text><text class="chart-current-value" x="${width - margin.right}" y="15" text-anchor="end">${periods()[state.frame]} · ${currentLabel}</text>`
+    const point = Number.isFinite(currentValue) ? `<circle class="chart-point${imputedClass}" cx="${x(state.frame)}" cy="${y(currentValue)}" r="5"/>` : ''
+    svg.innerHTML = `<defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#68a894" stop-opacity=".36"/><stop offset="1" stop-color="#68a894" stop-opacity=".02"/></linearGradient></defs>${grids}<path class="chart-future" d="${line}"/><path class="chart-area" d="${visibleArea}"/><path class="chart-line" d="${visibleLine}"/>${labels}<line class="chart-current-line" x1="${x(state.frame)}" y1="${margin.top}" x2="${x(state.frame)}" y2="${height - margin.bottom}"/>${point}<text class="chart-axis" x="10" y="15">${unit}</text><text class="chart-current-value" x="${width - margin.right}" y="15" text-anchor="end">${periods()[state.frame]} · ${currentLabel}</text>`
   }
 
   function drawShareTrend(cellIndex) {
@@ -624,6 +707,7 @@
   function applyTransform() {
     gridLayer.setAttribute('transform', `translate(${state.panX} ${state.panY}) scale(${state.zoom})`)
     selectedOutline.setAttribute('transform', `translate(${state.panX} ${state.panY}) scale(${state.zoom})`)
+    if (setting('color_scale').renderer === 'canvas-nightlights') updateMap()
   }
 
   document.querySelectorAll('.mode-switch button').forEach((button) => button.addEventListener('click', () => {
@@ -680,7 +764,10 @@
     state.pointerCell = null
     mapSvg.classList.remove('dragging')
   })
-  window.addEventListener('resize', () => drawTrend(state.selected === null ? regionalSeries() : seriesForCell(state.selected)))
+  window.addEventListener('resize', () => {
+    if (setting('color_scale').renderer === 'canvas-nightlights') updateMap()
+    drawTrend(state.selected === null ? regionalSeries() : seriesForCell(state.selected))
+  })
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && state.selected !== null) clearSelection() })
 
   const regionSelect = el('regionSelect')

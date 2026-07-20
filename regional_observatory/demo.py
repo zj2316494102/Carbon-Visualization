@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -9,16 +10,18 @@ def build(source_dir: Path, output: Path) -> None:
     html = (source_dir / "index.html").read_text(encoding="utf-8")
     css = (source_dir / "styles.css").read_text(encoding="utf-8")
     dataset = (source_dir / "data" / "dataset.js").read_text(encoding="utf-8")
+    color_scale = (source_dir / "color-scale.js").read_text(encoding="utf-8")
     app = (source_dir / "app.js").read_text(encoding="utf-8")
 
-    stylesheet = '<link rel="stylesheet" href="styles.css?v=20260720-5" />'
-    data_script = '<script src="data/dataset.js?v=20260720-5"></script>'
-    app_script = '<script src="app.js?v=20260720-5"></script>'
-    if stylesheet not in html or data_script not in html or app_script not in html:
-        raise ValueError("前端入口资源标记已变化，请更新打包脚本。")
-
-    html = html.replace(stylesheet, f"<style>\n{css}\n</style>")
-    html = html.replace(data_script, f"<script>\n{dataset}\n</script>")
-    html = html.replace(app_script, f"<script>\n{app}\n</script>")
+    replacements = [
+        (r'<link rel="stylesheet" href="styles\.css\?v=[^"]+"\s*/>', f"<style>\n{css}\n</style>"),
+        (r'<script src="data/dataset\.js\?v=[^"]+"></script>', f"<script>\n{dataset}\n</script>"),
+        (r'<script src="color-scale\.js\?v=[^"]+"></script>', f"<script>\n{color_scale}\n</script>"),
+        (r'<script src="app\.js\?v=[^"]+"></script>', f"<script>\n{app}\n</script>"),
+    ]
+    for pattern, replacement in replacements:
+        html, count = re.subn(pattern, lambda _: replacement, html, count=1)
+        if count != 1:
+            raise ValueError(f"前端入口资源标记未匹配：{pattern}")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")

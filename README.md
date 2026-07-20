@@ -57,6 +57,8 @@ POI 是每月快照存量：
 
 VIIRS 原始文件位于 `data/raw/viirs/`，包含四地区 2021—2023 年共 36 个月的 HKU-VIIRS 500 m 月度夜光数据，并已聚合到现有 1 km 网格。
 
+MODIS 原始文件位于 `data/raw/modis/`，包含四地区 2021—2023 年共 36 个月的 MOD13Q1 月度遥感数据。前端可切换 NDVI、EVI、红光反射率和近红外反射率；区域序列按各指标有效像元数加权，`pixel_count=0` 或空值按缺测处理。
+
 前端提供三项夜光指标：
 
 - 平均辐亮度：地图默认使用 `log1p(ntl_radiance_mean)` 着色，统计和详情保留原始物理量
@@ -170,12 +172,13 @@ conda run -n carbon-vis python -m http.server 8000 --directory web
 
 ### 数据适配器
 
-当前支持两种通用适配器：
+当前支持五种数据适配器：
 
 - `single_value`：每条网格-时间记录只有一个数值字段，例如 CO2 排放。
 - `wide_categories`：每条网格-时间记录包含多个分类数值字段，例如 POI 分类。
 - `wide_metrics`：每条网格-时间记录包含多个不同单位和聚合规则的指标，例如天气特征。
-- `nightlights`：同时导出夜光物理量、对数地图值、有效像元加权区域序列和质量标记。
+- `nightlights`：导出夜光物理量、有效像元加权区域序列和质量标记；地图变换由通用视觉编码层执行。
+- `remote_sensing`：导出多遥感指标、逐指标有效像元数、缺测状态和有效像元加权区域序列。
 
 共同要求：
 
@@ -206,10 +209,29 @@ conda run -n carbon-vis python manage.py export-web
 - 网格值和区域值单位
 - 小数精度与换算系数
 - 年度聚合口径
-- 色阶范围、零值颜色和整数刻度
+- 连续色带、归一化变换、范围、零值颜色和图例刻度
 - 地图标题、来源与页脚说明
 
-只有当新数据无法表示为现有两种表结构时，才需要在导出器增加新适配器。前端通常不需要修改。
+只有当新数据无法表示为现有适配器时，才需要在导出器增加新适配器。前端通常不需要修改。
+
+### 连续视觉编码
+
+`web/color-scale.js` 是通用视觉编码模块。地图只消费 `color_scale` 元数据，不按因子名称判断颜色逻辑。常用配置字段：
+
+- `transform`：`linear`、`log1p` 或 `sqrt`。
+- `palette`：由浅到深的十六进制颜色数组；默认在 OKLab 感知空间生成 256 色连续 LUT。
+- `clip_low` / `clip_high`：完整时间范围的分位裁剪点。
+- `fixed_min` / `minimum_max`：固定下界或最低上界。
+- `center: "median"`：以完整时间范围中位数作为发散色带中心。
+- `positive_domain: true`：仅使用正值建立范围，适合零值单独表达的稀疏计数。
+- `zero_color`：零值专用颜色。
+- `integer_ticks_below`：小范围整数数据使用逐整数图例刻度。
+- `auto_contrast`：按地区和指标分析相邻时期变化；仅在原值确有变化但颜色位移偏小时，自动收紧固定色域并改用首尾两色渐变。
+- `auto_contrast.enhanced_transform`：可为自动增强后的色域单独指定变换；CO2 使用 `linear`，避免收紧范围后继续使用对数变换而让常见值挤在最高色。
+
+地图、图例和 Canvas 光晕共用同一个 scale。`scale.color()` 生成颜色，`scale.normalize()` 提供连续强度，`scale.ticks()` 通过逆变换返回原始物理量刻度。新增连续型维度时，优先只在 catalog 声明上述元数据。
+
+自动对比不会制造数据变化。若相邻时期原值不变比例达到配置的 `static_ratio`，该指标保持原色阶；若原色阶的相邻颜色位移已经达到 `target_delta`，也不会重复增强。VIIRS 不启用此配置，继续使用独立 Canvas 夜光渲染。
 
 ### 前端数据契约
 
