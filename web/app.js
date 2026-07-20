@@ -26,6 +26,7 @@
   }
   let monthlyPeriods = data.topics[state.topic].periods
   let monthlyValues = data.topics[state.topic].values
+  let monthlyMapValues = monthlyValues
   let monthYears = [...new Set(monthlyPeriods.map((period) => period.slice(0, 4)))]
   let allMonthlyTotals = monthlyPeriods.map((_, index) => monthlyValues.reduce((sum, row) => sum + row[index], 0))
 
@@ -45,6 +46,7 @@
     precipitation: [[238, 248, 247], [191, 227, 223], [112, 193, 198], [39, 125, 161], [25, 74, 120]],
     wind: [[242, 239, 248], [208, 196, 228], [161, 139, 196], [116, 86, 158], [67, 38, 109]],
     radiation: [[255, 247, 204], [248, 214, 109], [238, 168, 60], [222, 107, 45], [169, 54, 38]],
+    nightlights: [[23, 24, 29], [49, 39, 71], [112, 64, 92], [208, 121, 62], [255, 227, 138]],
   }
 
   function periods() {
@@ -78,6 +80,7 @@
     monthlyPeriods = current.periods
     if (current.categories && !state.category) state.category = current.defaultCategory
     monthlyValues = current.categories ? current.values[state.category] : current.values
+    monthlyMapValues = current.mapValues?.[state.category] || monthlyValues
     monthYears = [...new Set(monthlyPeriods.map((period) => period.slice(0, 4)))]
     allMonthlyTotals = monthlyPeriods.map((_, index) => monthlyValues.reduce((sum, row) => sum + row[index], 0))
   }
@@ -102,6 +105,12 @@
     if (state.mode === 'month') return monthlyValues.map((row) => row[frame])
     const year = monthYears[frame]
     return monthlyValues.map((row) => aggregateYear(row, year))
+  }
+
+  function frameMapValues(frame = state.frame) {
+    if (state.mode === 'month') return monthlyMapValues.map((row) => row[frame])
+    const raw = frameValues(frame)
+    return category()?.map_transform === 'log1p' ? raw.map((value) => Math.log1p(Math.max(0, value))) : raw
   }
 
   function seriesForCell(cellIndex) {
@@ -143,8 +152,8 @@
 
   function colorScaleRange() {
     const values = state.mode === 'month'
-      ? monthlyValues.flat()
-      : monthYears.flatMap((_, index) => frameValues(index))
+      ? monthlyMapValues.flat()
+      : monthYears.flatMap((_, index) => frameMapValues(index))
     const scale = setting('color_scale')
     const min = scale.fixed_min ?? percentile(values, scale.quantile_low ?? 0)
     const quantileMax = percentile(values, scale.quantile_high ?? scale.quantile ?? .99)
@@ -218,7 +227,7 @@
     el('pageTitle').textContent = `${data.meta.regionZh} ${topicLabel()} 动态图谱`
     el('cellCount').textContent = data.meta.cellCount.toLocaleString('zh-CN')
     el('mapTitle').textContent = topic().map_title
-    el('legendLabel').textContent = `${setting('legend_label')}（${sourceUnit()}）`
+    el('legendLabel').textContent = `${setting('legend_label')}（${category()?.legend_unit || sourceUnit()}）`
     el('legendBar').className = setting('color_scale').css_class
     el('cellUnit').textContent = sourceUnit()
     el('footerSource').textContent = topic().footer_source
@@ -228,7 +237,7 @@
     el('maxMetricLabel').textContent = topic().regionalValues ? '当前最高网格' : '当前最高网格'
     if (state.selected === null) {
       el('chartTitle').textContent = topic().regionalValues ? '区域统计趋势' : '区域总量趋势'
-      el('chartSubtitle').textContent = topic().regionalValues ? '基于去重 API 参考点统计' : '完整观测时段'
+      el('chartSubtitle').textContent = topic().regionalValues ? (topic().trend_subtitle || '区域统计序列') : '完整观测时段'
     }
     renderFactorOverview()
     renderMethodology()
@@ -259,6 +268,8 @@
       ['单位', sourceUnit()],
       ['月度区域口径', spatialRuleLabel()],
     ]
+    const quality = currentQuality()
+    if (quality?.source) currentItems.push(['数据来源', quality.source])
     el('methodCurrent').replaceChildren(...currentItems.map(([label, value]) => {
       const item = document.createElement('div')
       item.innerHTML = `<span>${label}</span><strong>${value}</strong>`
@@ -349,7 +360,7 @@
     el('detailContent').hidden = true
     el('shareTrend').hidden = true
     el('chartTitle').textContent = topic().regionalValues ? '区域统计趋势' : '区域总量趋势'
-    el('chartSubtitle').textContent = topic().regionalValues ? '基于去重 API 参考点统计' : '完整观测时段'
+    el('chartSubtitle').textContent = topic().regionalValues ? (topic().trend_subtitle || '区域统计序列') : '完整观测时段'
     drawTrend(regionalSeries())
   }
 
@@ -373,12 +384,81 @@
       el('referenceLat').textContent = Number(reference[0]).toFixed(5) + '°'
       el('referenceLon').textContent = Number(reference[1]).toFixed(5) + '°'
     }
+    const quality = topic().quality
+    el('validPixelItem').hidden = !quality
+    el('qualityItem').hidden = !quality
+    if (quality) {
+      const periodIndex = state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)
+      const valid = topic().quality.ntl_valid_pixel_count[state.selected][periodIndex]
+      const missing = topic().quality.ntl_is_missing[state.selected][periodIndex]
+      const imputed = topic().quality.ntl_is_imputed[state.selected][periodIndex]
+      el('validPixelCount').textContent = `${valid} 个 500 m 像元`
+      el('cellQuality').textContent = missing ? '缺失' : imputed ? '填补数据' : '原始观测'
+    }
+    const nightlights = Boolean(topic().mapValues && topic().quality)
+    for (const id of ['ntlMeanItem', 'ntlMaxItem', 'ntlSumItem', 'ntlLogItem']) el(id).hidden = !nightlights
+    if (nightlights) {
+      const metricValue = (metricId) => {
+        const row = topic().values[metricId][state.selected]
+        return state.mode === 'month' ? row[state.frame] : aggregateIndices(row, yearIndices(monthYears[state.frame]), topic().categories.find((item) => item.id === metricId)?.annual_aggregation || 'mean')
+      }
+      const mean = metricValue('ntl_radiance_mean')
+      el('ntlMean').textContent = formatNumber(mean, 2)
+      el('ntlMax').textContent = formatNumber(metricValue('ntl_radiance_max'), 2)
+      el('ntlSum').textContent = formatNumber(metricValue('ntl_radiance_sum'), 2)
+      el('ntlLog').textContent = formatNumber(Math.log1p(Math.max(0, mean)), 3)
+    }
+    el('dataSourceItem').hidden = !nightlights
+    el('dateRangeItem').hidden = !nightlights
+    if (nightlights) {
+      const index = state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)
+      const periodQuality = topic().periodQuality[index]
+      el('dataSourceValue').textContent = periodQuality.source
+      el('dateRangeValue').textContent = state.mode === 'month' ? `${periodQuality.startDate} 至 ${periodQuality.endDate}` : `${monthYears[state.frame]} 年度`
+    }
+  }
+
+  function currentQuality() {
+    if (!topic().periodQuality) return null
+    if (state.mode === 'month') return topic().periodQuality[state.frame]
+    const indices = yearIndices(monthYears[state.frame])
+    const entries = indices.map((index) => topic().periodQuality[index])
+    return {
+      imputedCount: Math.max(...entries.map((item) => item.imputedCount)),
+      missingCount: Math.max(...entries.map((item) => item.missingCount)),
+      imputedMonths: entries.filter((item) => item.imputedCount > 0).length,
+    }
+  }
+
+  function updateQualityBadge() {
+    const quality = currentQuality()
+    const badge = el('qualityBadge')
+    badge.hidden = !quality
+    el('map').classList.remove('imputed-frame')
+    if (!quality) return
+    badge.className = 'quality-badge'
+    if (quality.missingCount > 0) {
+      badge.textContent = `部分缺失 · ${quality.missingCount} 网格`
+      badge.classList.add('missing')
+    } else if (quality.imputedCount > 0) {
+      badge.textContent = state.mode === 'month' ? `整月填补 · ${quality.imputedCount} 网格` : `含 ${quality.imputedMonths} 个填补月份`
+      badge.classList.add('imputed')
+      el('map').classList.add('imputed-frame')
+    } else {
+      badge.textContent = '原始观测'
+    }
   }
 
   function updateMap() {
-    const values = frameValues()
+    const values = frameMapValues()
     const scale = colorScaleRange()
-    Array.from(gridLayer.children).forEach((path, index) => { path.style.fill = mapColor(values[index], scale.min, scale.max) })
+    const quality = topic().quality
+    const qualityIndex = quality ? (state.mode === 'month' ? state.frame : yearIndices(monthYears[state.frame]).at(-1)) : null
+    Array.from(gridLayer.children).forEach((path, index) => {
+      const missing = quality ? quality.ntl_is_missing[index][qualityIndex] === 1 : false
+      path.classList.toggle('missing-data', missing)
+      path.style.fill = missing ? '' : mapColor(values[index], scale.min, scale.max)
+    })
     const digits = setting('value_precision')
     const scaleConfig = setting('color_scale')
     const ticks = scaleConfig.integer_ticks_below > 0 && scale.max <= scaleConfig.integer_ticks_below && scale.min >= 0
@@ -390,6 +470,7 @@
       return tick
     }))
     el('mapSubtitle').textContent = `${periods()[state.frame]} · ${topicLabel()} · ${data.meta.cellCount} 个 1 km 网格`
+    updateQualityBadge()
     updateTooltip()
   }
 
@@ -454,7 +535,8 @@
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
     const currentValue = values[state.frame]
     const currentLabel = `${formatNumber(currentValue / divisor, isCell ? setting('value_precision') : setting('regional_precision'))} ${unit}`
-    svg.innerHTML = `<defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#68a894" stop-opacity=".36"/><stop offset="1" stop-color="#68a894" stop-opacity=".02"/></linearGradient></defs>${grids}<path class="chart-future" d="${line}"/><path class="chart-area" d="${visibleArea}"/><path class="chart-line" d="${visibleLine}"/>${labels}<line class="chart-current-line" x1="${x(state.frame)}" y1="${margin.top}" x2="${x(state.frame)}" y2="${height - margin.bottom}"/><circle class="chart-point" cx="${x(state.frame)}" cy="${y(currentValue)}" r="5"/><text class="chart-axis" x="10" y="15">${unit}</text><text class="chart-current-value" x="${width - margin.right}" y="15" text-anchor="end">${periods()[state.frame]} · ${currentLabel}</text>`
+    const imputedClass = currentQuality()?.imputedCount > 0 ? ' imputed' : ''
+    svg.innerHTML = `<defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#68a894" stop-opacity=".36"/><stop offset="1" stop-color="#68a894" stop-opacity=".02"/></linearGradient></defs>${grids}<path class="chart-future" d="${line}"/><path class="chart-area" d="${visibleArea}"/><path class="chart-line" d="${visibleLine}"/>${labels}<line class="chart-current-line" x1="${x(state.frame)}" y1="${margin.top}" x2="${x(state.frame)}" y2="${height - margin.bottom}"/><circle class="chart-point${imputedClass}" cx="${x(state.frame)}" cy="${y(currentValue)}" r="5"/><text class="chart-axis" x="10" y="15">${unit}</text><text class="chart-current-value" x="${width - margin.right}" y="15" text-anchor="end">${periods()[state.frame]} · ${currentLabel}</text>`
   }
 
   function drawShareTrend(cellIndex) {
@@ -699,6 +781,10 @@
       categorySelect.value = requestedCategory
     }
     syncTopicData()
+  }
+  const requestedFrame = Number(query.get('frame'))
+  if (Number.isInteger(requestedFrame) && requestedFrame >= 0 && requestedFrame < monthlyPeriods.length) {
+    state.frame = requestedFrame
   }
   if (initialRegion === bundle.defaultRegion) {
     updateRegionLabels()

@@ -11,7 +11,8 @@
       "topics": {
         "co2": { "files": "data/raw/co2/singapore_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/singapore/poi_grid_*.csv" },
-        "weather": { "files": "data/raw/weather/singapore/*.csv" }
+        "weather": { "files": "data/raw/weather/singapore/*.csv" },
+        "viirs": { "files": "data/raw/viirs/singapore/*.csv" }
       }
     },
     {
@@ -23,7 +24,8 @@
       "topics": {
         "co2": { "files": "data/raw/co2/new_york_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/new_york/poi_grid_*.csv" },
-        "weather": { "files": "data/raw/weather/new_york/*.csv" }
+        "weather": { "files": "data/raw/weather/new_york/*.csv" },
+        "viirs": { "files": "data/raw/viirs/new_york/*.csv" }
       }
     },
     {
@@ -35,7 +37,8 @@
       "topics": {
         "co2": { "files": "data/raw/co2/tokyo_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/tokyo/poi_grid_*.csv" },
-        "weather": { "files": "data/raw/weather/tokyo/*.csv" }
+        "weather": { "files": "data/raw/weather/tokyo/*.csv" },
+        "viirs": { "files": "data/raw/viirs/tokyo/*.csv" }
       }
     },
     {
@@ -47,7 +50,8 @@
       "topics": {
         "co2": { "files": "data/raw/co2/chicago_odiac_1km/*.csv" },
         "poi": { "files": "data/raw/poi/chicago/poi_grid_*.csv" },
-        "weather": { "files": "data/raw/weather/chicago/*.csv" }
+        "weather": { "files": "data/raw/weather/chicago/*.csv" },
+        "viirs": { "files": "data/raw/viirs/chicago/*.csv" }
       }
     }
   ],
@@ -152,6 +156,7 @@
       "footer_source": "气象数据来自 Open-Meteo 月度统计；网格值映射自 API 参考点",
       "footer_unit": "不同指标使用各自气象单位",
       "show_share": false,
+      "trend_subtitle": "基于去重 API 参考点统计",
       "methodology": {
         "summary": "Open-Meteo 月度气象统计由少量 API 参考点映射到 1 km 网格。多个网格可能共享同一参考点，因此区域统计先按参考点去重。",
         "fields": [
@@ -198,6 +203,64 @@
           "regional_unit": "MJ/m²", "regional_factor": 1, "spatial_aggregation": "mean_unique_reference",
           "annual_aggregation": "sum", "value_precision": 1, "regional_precision": 1, "change_precision": 1,
           "legend_label": "月累计短波辐射", "palette": "radiation", "color_scale": { "quantile_low": 0, "quantile_high": 1, "css_class": "weather-radiation" }
+        }
+      ]
+    },
+    "viirs": {
+      "label": "VIIRS 夜间灯光",
+      "adapter": "nightlights",
+      "period_column": "period",
+      "period_format": "%Y%m",
+      "temporal_kind": "metric_defined",
+      "unit": "nW/(cm²·sr)",
+      "regional_unit": "nW/(cm²·sr)",
+      "regional_factor": 1,
+      "value_precision": 2,
+      "regional_precision": 2,
+      "change_precision": 2,
+      "map_title": "空间夜间灯光分布",
+      "legend_label": "网格夜光辐亮度",
+      "source_label": "HKU VIIRS 500 m monthly nightlights",
+      "footer_source": "VIIRS 500 m 月度夜光像元聚合至 1 km 网格；填补月份保留并明确标注",
+      "footer_unit": "辐亮度单位：nW/(cm²·sr)",
+      "show_share": false,
+      "trend_subtitle": "基于有效像元加权统计",
+      "defaultCategory": "ntl_radiance_mean",
+      "quality": true,
+      "methodology": {
+        "summary": "HKU-VIIRS 500 m 月度夜光影像聚合至 1 km 网格。默认地图使用 log1p(平均辐亮度) 缓解右偏分布，但区域统计和详情保留原始物理量。",
+        "fields": [
+          { "name": "ntl_radiance_mean", "meaning": "网格内有效像元平均辐亮度，单位 nW/(cm²·sr)" },
+          { "name": "ntl_radiance_max", "meaning": "网格内有效像元最大辐亮度" },
+          { "name": "ntl_radiance_sum", "meaning": "网格内有效像元辐亮度总和" },
+          { "name": "ntl_valid_pixel_count", "meaning": "参与统计的 500 m 有效像元数量" },
+          { "name": "ntl_is_missing", "meaning": "是否缺失：1 为无有效观测" },
+          { "name": "ntl_is_imputed", "meaning": "是否由其他月份中位数填补" },
+          { "name": "ntl_log_radiance_mean", "meaning": "log1p(平均辐亮度)，仅用于地图视觉表达" },
+          { "name": "source / start_date / end_date", "meaning": "数据来源及月度统计起止日期" }
+        ],
+        "spatial_rule": "区域平均辐亮度按有效像元加权：Σ辐亮度总和 ÷ Σ有效像元数；最大值取区域网格最大值；总辐亮度取全部网格总和。",
+        "annual_rule": "平均辐亮度取 12 个月均值；最大辐亮度取全年最大值；总辐亮度取 12 个月区域总辐亮度的月均值。"
+      },
+      "metrics": [
+        {
+          "id": "ntl_radiance_mean", "label": "平均辐亮度", "short_label": "平均", "unit": "nW/(cm²·sr)",
+          "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
+          "spatial_aggregation": "weighted_mean_pixels", "map_transform": "log1p", "map_value_column": "ntl_log_radiance_mean",
+          "value_precision": 2, "regional_precision": 2, "change_precision": 2,
+          "legend_label": "log1p 平均辐亮度", "legend_unit": "对数值", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
+        },
+        {
+          "id": "ntl_radiance_max", "label": "最大辐亮度", "short_label": "最大", "unit": "nW/(cm²·sr)",
+          "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "max",
+          "spatial_aggregation": "max", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
+          "legend_label": "最大辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
+        },
+        {
+          "id": "ntl_radiance_sum", "label": "总辐亮度", "short_label": "总和", "unit": "nW/(cm²·sr)",
+          "regional_unit": "nW/(cm²·sr)", "regional_factor": 1, "annual_aggregation": "mean",
+          "spatial_aggregation": "sum", "value_precision": 2, "regional_precision": 2, "change_precision": 2,
+          "legend_label": "网格总辐亮度", "palette": "nightlights", "color_scale": { "fixed_min": 0, "quantile_high": 0.99, "css_class": "viirs-scale" }
         }
       ]
     }

@@ -53,6 +53,20 @@ POI 是每月快照存量：
 - 年度降水和辐射取 12 个月累计
 - 年度风速取全年最大值
 
+## VIIRS 夜间灯光
+
+VIIRS 原始文件位于 `data/raw/viirs/`，包含四地区 2021—2023 年共 36 个月的 HKU-VIIRS 500 m 月度夜光数据，并已聚合到现有 1 km 网格。
+
+前端提供三项夜光指标：
+
+- 平均辐亮度：地图默认使用 `log1p(ntl_radiance_mean)` 着色，统计和详情保留原始物理量
+- 最大辐亮度：显示网格或区域极亮值
+- 总辐亮度：显示有效像元辐亮度之和
+
+区域平均辐亮度按有效像元加权计算：`Σ ntl_radiance_sum ÷ Σ ntl_valid_pixel_count`。逐年模式下，平均辐亮度取年均、最大辐亮度取全年最大、总辐亮度取 12 个月月均。
+
+质量字段会在页面明确呈现：有效像元数、是否缺失、是否填补、来源和统计日期。新加坡 `2022-07` 与 `2023-01` 为整月填补数据，动画保留这些月份并使用质量徽标、地图边框和空心趋势点标注。
+
 ## 环境
 
 ```bash
@@ -66,7 +80,7 @@ conda activate carbon-vis
 逐月：
 
 ```bash
-conda run -n carbon-vis python animate_material_change.py \
+conda run -n carbon-vis python manage.py animate \
   --config config/co2_singapore.json \
   --frequency month \
   --output output/animations/co2_singapore_month.gif
@@ -75,7 +89,7 @@ conda run -n carbon-vis python animate_material_change.py \
 逐年：
 
 ```bash
-conda run -n carbon-vis python animate_material_change.py \
+conda run -n carbon-vis python manage.py animate \
   --config config/co2_singapore.json \
   --frequency year \
   --output output/animations/co2_singapore_year.gif
@@ -118,7 +132,7 @@ conda run -n carbon-vis python animate_material_change.py \
 先更新浏览器数据包：
 
 ```bash
-conda run -n carbon-vis python export_web_data.py \
+conda run -n carbon-vis python manage.py export-web \
   --output web/data/dataset.js
 ```
 
@@ -147,8 +161,10 @@ conda run -n carbon-vis python -m http.server 8000 --directory web
 
 1. `data/raw/`：原始数据，只按因子和地区归档，不在前端直接读取。
 2. `config/data_catalog.json`：统一声明地区、因子、字段、单位、时间口径、色阶和文案。
-3. `export_web_data.py`：根据 catalog 校验数据并生成紧凑的 `web/data/dataset.js`。
+3. `regional_observatory/`：数据适配、导出、绘图和 Demo 打包实现，不提供独立执行入口。
 4. `web/`：通用可视化界面，只消费导出的元数据和矩阵，不包含具体因子判断。
+
+项目唯一命令入口是根目录 `manage.py`。所有任务必须通过其子命令执行，包内模块不可直接运行。
 
 地区几何只导出一次，由同一地区的全部因子共享。每个因子只保存时间序列矩阵和显示元数据。
 
@@ -159,6 +175,7 @@ conda run -n carbon-vis python -m http.server 8000 --directory web
 - `single_value`：每条网格-时间记录只有一个数值字段，例如 CO2 排放。
 - `wide_categories`：每条网格-时间记录包含多个分类数值字段，例如 POI 分类。
 - `wide_metrics`：每条网格-时间记录包含多个不同单位和聚合规则的指标，例如天气特征。
+- `nightlights`：同时导出夜光物理量、对数地图值、有效像元加权区域序列和质量标记。
 
 共同要求：
 
@@ -180,7 +197,7 @@ conda run -n carbon-vis python -m http.server 8000 --directory web
 4. 运行导出命令：
 
 ```bash
-conda run -n carbon-vis python export_web_data.py
+conda run -n carbon-vis python manage.py export-web
 ```
 
 前端会自动新增因子选项，并根据 catalog 控制：
@@ -214,5 +231,5 @@ conda run -n carbon-vis python export_web_data.py
 更新前端或数据后，重新生成离线文件：
 
 ```bash
-conda run -n carbon-vis python build_teacher_demo.py
+conda run -n carbon-vis python manage.py build-demo
 ```

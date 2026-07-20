@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0" />
     <meta name="description" content="区域多源数据时空动态观测与分析" />
     <title>区域时空动态观测</title>
-    <link rel="stylesheet" href="styles.css?v=20260720-3" />
+    <link rel="stylesheet" href="styles.css?v=20260720-5" />
   </head>
   <body>
     <header class="topbar">
@@ -33,8 +33,8 @@
 
       <section class="workspace">
         <article class="map-panel panel">
-          <div class="panel-heading"><div><h2 id="mapTitle">空间排放分布</h2><p id="mapSubtitle">--</p></div><div class="map-tools"><button id="zoomOut" title="缩小" aria-label="缩小">−</button><button id="resetMap" title="复位地图" aria-label="复位地图">⌂</button><button id="zoomIn" title="放大" aria-label="放大">＋</button></div></div>
-          <div id="map" class="map" aria-label="排放网格地图"><svg id="mapSvg" role="img"><g id="gridLayer"></g><path id="selectedOutline"></path></svg><div id="tooltip" class="tooltip" hidden></div><button id="replayOverlay" class="replay-overlay" hidden aria-label="重新播放"><span class="replay-pause" aria-hidden="true"><i></i><i></i></span><strong>播放已结束</strong><small>点击重新播放</small></button></div>
+          <div class="panel-heading"><div><div class="map-title-row"><h2 id="mapTitle">空间排放分布</h2><span id="qualityBadge" class="quality-badge" hidden></span></div><p id="mapSubtitle">--</p></div><div class="map-tools"><button id="zoomOut" title="缩小" aria-label="缩小">−</button><button id="resetMap" title="复位地图" aria-label="复位地图">⌂</button><button id="zoomIn" title="放大" aria-label="放大">＋</button></div></div>
+          <div id="map" class="map" aria-label="排放网格地图"><svg id="mapSvg" role="img"><defs><pattern id="missingPattern" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#e6e9e7"></rect><line x1="0" y1="0" x2="0" y2="6" stroke="#9da7a1" stroke-width="2"></line></pattern></defs><g id="gridLayer"></g><path id="selectedOutline"></path></svg><div id="tooltip" class="tooltip" hidden></div><button id="replayOverlay" class="replay-overlay" hidden aria-label="重新播放"><span class="replay-pause" aria-hidden="true"><i></i><i></i></span><strong>播放已结束</strong><small>点击重新播放</small></button></div>
           <div class="legend"><div id="legendBar"></div><div id="legendValues" class="legend-values"></div><p id="legendLabel">网格排放量（tC）</p></div>
         </article>
 
@@ -44,7 +44,7 @@
             <div id="emptyDetail" class="empty-detail"><span class="target-icon">⌖</span><strong>选择一个网格</strong><p>查看坐标、当前排放量和历史序列</p></div>
             <div id="detailContent" class="detail-content" hidden>
               <div class="cell-value"><span id="detailPeriod">--</span><strong id="cellValue">--</strong><small id="cellUnit">tC</small></div>
-              <dl><div><dt>经度</dt><dd id="cellLon">--</dd></div><div><dt>纬度</dt><dd id="cellLat">--</dd></div><div><dt>空间排名</dt><dd id="cellRank">--</dd></div><div id="referenceLonItem" hidden><dt>API 经度</dt><dd id="referenceLon">--</dd></div><div id="referenceLatItem" hidden><dt>API 纬度</dt><dd id="referenceLat">--</dd></div></dl>
+              <dl><div><dt>经度</dt><dd id="cellLon">--</dd></div><div><dt>纬度</dt><dd id="cellLat">--</dd></div><div><dt>空间排名</dt><dd id="cellRank">--</dd></div><div id="referenceLonItem" hidden><dt>API 经度</dt><dd id="referenceLon">--</dd></div><div id="referenceLatItem" hidden><dt>API 纬度</dt><dd id="referenceLat">--</dd></div><div id="validPixelItem" hidden><dt>有效像元</dt><dd id="validPixelCount">--</dd></div><div id="qualityItem" hidden><dt>数据质量</dt><dd id="cellQuality">--</dd></div><div id="ntlMeanItem" hidden><dt>原始均值</dt><dd id="ntlMean">--</dd></div><div id="ntlMaxItem" hidden><dt>最大辐亮度</dt><dd id="ntlMax">--</dd></div><div id="ntlSumItem" hidden><dt>总辐亮度</dt><dd id="ntlSum">--</dd></div><div id="ntlLogItem" hidden><dt>对数均值</dt><dd id="ntlLog">--</dd></div><div id="dataSourceItem" hidden><dt>数据来源</dt><dd id="dataSourceValue">--</dd></div><div id="dateRangeItem" hidden><dt>统计日期</dt><dd id="dateRangeValue">--</dd></div></dl>
             </div>
           </article>
           <article class="panel trend-panel">
@@ -72,7 +72,7 @@
     </dialog>
 
     <footer><span id="footerSource">数值来自项目内原始 ODIAC 数据，未进行插值</span><span id="footerUnit">原始单位：吨碳（tC）</span></footer>
-    <script src="data/dataset.js?v=20260720-3"></script>
-    <script src="app.js?v=20260720-3"></script>
+    <script src="data/dataset.js?v=20260720-5"></script>
+    <script src="app.js?v=20260720-5"></script>
   </body>
 </html>
